@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "onecopy-commerce",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-17",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/health", "/admin"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "onecopy-clean-db",
+      "database_id": "REPLACE_WITH_NEW_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "STORE_NAME": "Magic Door Books",
+    "STORE_SUBTITLE": "Books, games & curious things",
+    "STORE_LOCATION": "Second Street · Pomona, California",
+    "STORE_EMAIL": "",
+    "SHIPPING_USD": "0",
+    "SQUARE_ENVIRONMENT": "sandbox",
+    "SQUARE_APPLICATION_ID": "",
+    "SQUARE_LOCATION_ID": "",
+    "SQUARE_VERSION": "2026-09-16",
+    "SEED_DEMO": "false"
+  }
+}
