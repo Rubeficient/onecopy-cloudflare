@@ -84,6 +84,224 @@ async function ensureSchema(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_oauth_states (state TEXT PRIMARY KEY, session_hash TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_listings (product_id TEXT PRIMARY KEY, sku TEXT NOT NULL UNIQUE, offer_id TEXT NOT NULL DEFAULT '', listing_id TEXT NOT NULL DEFAULT '', listing_status TEXT NOT NULL DEFAULT 'not_listed', marketplace_id TEXT NOT NULL DEFAULT 'EBAY_US', last_error TEXT NOT NULL DEFAULT '', last_synced_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')").run();
 }
+
+const EBAY_SCOPES = [
+ "https://api.ebay.com/oauth/api_scope",
+ "https://api.ebay.com/oauth/api_scope/sell.inventory",
+ "https://api.ebay.com/oauth/api_scope/sell.account"
+].join(" ");
+function cookieValue(req,name){const c=req.headers.get("Cookie")||"";const m=c.match(/(?:^|;\s*)onecopy_session=([^;]+)/);return m?m[1]:"";}
+async function sha256hex(value){const d=new Uint8Array(await crypto.subtle.digest("SHA-256",enc.encode(value)));return Array.from(d,b=>b.toString(16).padStart(2,"0")).join("");}
+async function encryptEbayToken(value,secret){
+ const raw=await crypto.subtle.digest("SHA-256",enc.encode(secret));
+ const key=await crypto.subtle.importKey("raw",raw,{name:"AES-GCM"},false,["encrypt"]);
+ const iv=crypto.getRandomValues(new Uint8Array(12));
+ const cipher=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},key,enc.encode(value)));
+ return b64u(iv)+"."+b64u(cipher);
+}
+async function decryptEbayToken(value,secret){
+ const parts=String(value||"").split(".");
+ if(parts.length!==2)throw new Error("Saved eBay credential could not be decrypted. Reconnect eBay.");
+ const raw=await crypto.subtle.digest("SHA-256",enc.encode(secret));
+ const key=await crypto.subtle.importKey("raw",raw,{name:"AES-GCM"},false,["decrypt"]);
+ try{return new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64u(parts[0])},key,unb64u(parts[1])));}
+ catch{throw new Error("Saved eBay credential could not be decrypted. Check EBAY_TOKEN_ENCRYPTION_KEY and reconnect eBay.");}
+}
+function ebayMode(env){return String(env.EBAY_ENVIRONMENT||"production").toLowerCase()==="sandbox"?"sandbox":"production";}
+function ebayApiRoot(env){return ebayMode(env)==="sandbox"?"https://api.sandbox.ebay.com":"https://api.ebay.com";}
+function ebayAuthRoot(env){return ebayMode(env)==="sandbox"?"https://auth.sandbox.ebay.com":"https://auth.ebay.com";}
+function ebayTokenRoot(env){return ebayApiRoot(env)+"/identity/v1/oauth2/token";}
+function ebayAppConfigured(env){return Boolean(env.EBAY_CLIENT_ID&&env.EBAY_CLIENT_SECRET&&env.EBAY_RUNAME&&env.EBAY_TOKEN_ENCRYPTION_KEY);}
+function ebayMissingAppConfig(env){
+ const missing=[];
+ if(!env.EBAY_CLIENT_ID)missing.push("EBAY_CLIENT_ID");
+ if(!env.EBAY_CLIENT_SECRET)missing.push("EBAY_CLIENT_SECRET");
+ if(!env.EBAY_RUNAME)missing.push("EBAY_RUNAME");
+ if(!env.EBAY_TOKEN_ENCRYPTION_KEY)missing.push("EBAY_TOKEN_ENCRYPTION_KEY");
+ return missing;
+}
+function ebayTextError(data,status){
+ let detail="";
+ if(data&&Array.isArray(data.errors))detail=data.errors.map(x=>[x.errorId,x.message,x.longMessage].filter(Boolean).join(": ")).join("; ");
+ else if(data&&Array.isArray(data.warnings))detail=data.warnings.map(x=>x.message).filter(Boolean).join("; ");
+ else if(data&&data.error_description)detail=data.error_description;
+ else if(data&&data.message)detail=data.message;
+ else if(data&&data.error)detail=typeof data.error==="string"?data.error:JSON.stringify(data.error);
+ return "eBay API ("+status+"): "+(detail||"Request was rejected. Check seller setup and required listing fields.").slice(0,900);
+}
+async function ebayRequest(env,path,options,token){
+ const headers=Object.assign({"accept":"application/json","content-type":"application/json","content-language":"en-US"},options&&options.headers||{});
+ if(token)headers.authorization="Bearer "+token;
+ const response=await fetch(ebayApiRoot(env)+path,Object.assign({},options||{},{headers}));
+ const raw=await response.text();let data={};
+ if(raw){try{data=JSON.parse(raw);}catch{data={message:raw.slice(0,400)};}}
+ if(!response.ok){const err=new Error(ebayTextError(data,response.status));err.status=response.status;throw err;}
+ return {status:response.status,data};
+}
+async function ebayTokenPost(env,body){
+ if(!env.EBAY_CLIENT_ID||!env.EBAY_CLIENT_SECRET)throw new Error("Set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET as Cloudflare Worker secrets first.");
+ const response=await fetch(ebayTokenRoot(env),{
+  method:"POST",
+  headers:{"authorization":"Basic "+btoa(env.EBAY_CLIENT_ID+":"+env.EBAY_CLIENT_SECRET),"content-type":"application/x-www-form-urlencoded","accept":"application/json"},
+  body:new URLSearchParams(body)
+ });
+ const raw=await response.text();let data={};if(raw){try{data=JSON.parse(raw);}catch{data={message:raw.slice(0,300)};}}
+ if(!response.ok)throw new Error("eBay OAuth ("+response.status+"): "+String(data.error_description||data.error||data.message||"Token request failed").slice(0,500));
+ return data;
+}
+async function ebayAccessToken(env){
+ if(!env.EBAY_TOKEN_ENCRYPTION_KEY)throw new Error("Missing Cloudflare secret EBAY_TOKEN_ENCRYPTION_KEY.");
+ const saved=await env.DB.prepare("SELECT refresh_token_cipher, scopes FROM ebay_connection WHERE id=1").first();
+ if(!saved||!saved.refresh_token_cipher)throw new Error("eBay is not connected. Use Connect eBay first.");
+ const refreshToken=await decryptEbayToken(saved.refresh_token_cipher,env.EBAY_TOKEN_ENCRYPTION_KEY);
+ const token=await ebayTokenPost(env,{grant_type:"refresh_token",refresh_token:refreshToken,scope:EBAY_SCOPES});
+ if(token.refresh_token&&token.refresh_token!==refreshToken){
+  const cipher=await encryptEbayToken(token.refresh_token,env.EBAY_TOKEN_ENCRYPTION_KEY);
+  await env.DB.prepare("UPDATE ebay_connection SET refresh_token_cipher=?,updated_at=? WHERE id=1").bind(cipher,new Date().toISOString()).run();
+ }
+ if(!token.access_token)throw new Error("eBay did not return an access token. Reconnect eBay and try again.");
+ return token.access_token;
+}
+async function startEbayOAuth(req,env,url){
+ if(!ebayAppConfigured(env))return {error:"eBay app credentials are not configured. Add these four Worker secrets in Cloudflare: "+ebayMissingAppConfig(env).join(", ")+". The eBay redirect URL to register is "+url.origin+"/api/ebay/callback"};
+ const sess=cookieValue(req,"onecopy_session");if(!sess)throw new Error("Admin session missing. Sign in again.");
+ const state=b64u(crypto.getRandomValues(new Uint8Array(32)));
+ const now=new Date(),expires=new Date(now.getTime()+10*60*1000).toISOString();
+ await env.DB.prepare("DELETE FROM ebay_oauth_states WHERE expires_at < ?").bind(now.toISOString()).run();
+ await env.DB.prepare("INSERT INTO ebay_oauth_states (state,session_hash,expires_at,created_at) VALUES (?,?,?,?)").bind(state,await sha256hex(sess),expires,now.toISOString()).run();
+ const target=new URL(ebayAuthRoot(env)+"/oauth2/authorize");
+ target.searchParams.set("client_id",env.EBAY_CLIENT_ID);
+ target.searchParams.set("response_type","code");
+ target.searchParams.set("redirect_uri",env.EBAY_RUNAME);
+ target.searchParams.set("scope",EBAY_SCOPES);
+ target.searchParams.set("state",state);
+ return {authUrl:target.toString()};
+}
+async function handleEbayCallback(req,env,url){
+ await ensureSchema(env);
+ const target=new URL("/admin",url);
+ const state=url.searchParams.get("state")||"";
+ const sess=cookieValue(req,"onecopy_session");
+ if(!state||!sess||!await auth(req,env.SESSION_SECRET)){
+  target.searchParams.set("ebay","error");target.searchParams.set("reason","The admin session or OAuth state is missing. Sign in and connect again.");
+  return Response.redirect(target.toString(),302);
+ }
+ const saved=await env.DB.prepare("SELECT state,session_hash,expires_at FROM ebay_oauth_states WHERE state=?").bind(state).first();
+ if(!saved||saved.expires_at<=new Date().toISOString()||saved.session_hash!==await sha256hex(sess)){
+  if(saved)await env.DB.prepare("DELETE FROM ebay_oauth_states WHERE state=?").bind(state).run();
+  target.searchParams.set("ebay","error");target.searchParams.set("reason","eBay connection expired or failed state verification. Please connect again.");
+  return Response.redirect(target.toString(),302);
+ }
+ await env.DB.prepare("DELETE FROM ebay_oauth_states WHERE state=?").bind(state).run();
+ const denied=url.searchParams.get("error");
+ if(denied){
+  target.searchParams.set("ebay","error");target.searchParams.set("reason",String(url.searchParams.get("error_description")||denied).slice(0,220));
+  return Response.redirect(target.toString(),302);
+ }
+ const code=url.searchParams.get("code");
+ if(!code){target.searchParams.set("ebay","error");target.searchParams.set("reason","eBay did not return an authorization code.");return Response.redirect(target.toString(),302);}
+ try{
+  if(!ebayAppConfigured(env))throw new Error("eBay app secrets are missing from Cloudflare.");
+  const token=await ebayTokenPost(env,{grant_type:"authorization_code",code,redirect_uri:env.EBAY_RUNAME});
+  if(!token.refresh_token)throw new Error("eBay did not return a refresh token. Check the RuName and OAuth consent settings.");
+  const cipher=await encryptEbayToken(token.refresh_token,env.EBAY_TOKEN_ENCRYPTION_KEY);
+  const now=new Date().toISOString();
+  await env.DB.prepare("INSERT INTO ebay_connection (id,refresh_token_cipher,scopes,connected_at,updated_at) VALUES (1,?,?,?,?) ON CONFLICT(id) DO UPDATE SET refresh_token_cipher=excluded.refresh_token_cipher,scopes=excluded.scopes,connected_at=excluded.connected_at,updated_at=excluded.updated_at").bind(cipher,String(token.scope||EBAY_SCOPES),now,now).run();
+  target.searchParams.set("ebay","connected");
+ }catch(e){
+  target.searchParams.set("ebay","error");target.searchParams.set("reason",String(e&&e.message||"Could not finish eBay authorization").slice(0,220));
+ }
+ return Response.redirect(target.toString(),302);
+}
+async function loadEbaySettings(env){return await env.DB.prepare("SELECT * FROM ebay_settings WHERE id=1").first();}
+async function saveEbaySettings(env,b){
+ const values={
+  marketplace_id:s(b.marketplace_id||"EBAY_US",20),currency:s(b.currency||"USD",3),
+  category_id:s(b.category_id,30),merchant_location_key:s(b.merchant_location_key||"magic-door-books",50),
+  location_name:s(b.location_name||"Magic Door Books",100),address_line1:s(b.address_line1,120),
+  city:s(b.city||"Pomona",100),state_or_province:s(b.state_or_province||"CA",100),
+  postal_code:s(b.postal_code,20),country:s(b.country||"US",2).toUpperCase(),
+  fulfillment_policy_id:s(b.fulfillment_policy_id,100),payment_policy_id:s(b.payment_policy_id,100),
+  return_policy_id:s(b.return_policy_id,100),listing_duration:s(b.listing_duration||"GTC",10),updated_at:new Date().toISOString()
+ };
+ if(!/^[A-Z]{2}$/.test(values.country))throw new Error("Country must be a two-letter code such as US.");
+ await env.DB.prepare("INSERT INTO ebay_settings (id,marketplace_id,currency,category_id,merchant_location_key,location_name,address_line1,city,state_or_province,postal_code,country,fulfillment_policy_id,payment_policy_id,return_policy_id,listing_duration,updated_at) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET marketplace_id=excluded.marketplace_id,currency=excluded.currency,category_id=excluded.category_id,merchant_location_key=excluded.merchant_location_key,location_name=excluded.location_name,address_line1=excluded.address_line1,city=excluded.city,state_or_province=excluded.state_or_province,postal_code=excluded.postal_code,country=excluded.country,fulfillment_policy_id=excluded.fulfillment_policy_id,payment_policy_id=excluded.payment_policy_id,return_policy_id=excluded.return_policy_id,listing_duration=excluded.listing_duration,updated_at=excluded.updated_at").bind(values.marketplace_id,values.currency,values.category_id,values.merchant_location_key,values.location_name,values.address_line1,values.city,values.state_or_province,values.postal_code,values.country,values.fulfillment_policy_id,values.payment_policy_id,values.return_policy_id,values.listing_duration,values.updated_at).run();
+ return values;
+}
+async function ebayApiSetupStatus(env,url){
+ const settings=await loadEbaySettings(env);
+ const connection=await env.DB.prepare("SELECT connected_at,updated_at,scopes FROM ebay_connection WHERE id=1").first();
+ const summary=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN listing_status='published' THEN 1 ELSE 0 END) AS published,SUM(CASE WHEN last_error!='' THEN 1 ELSE 0 END) AS errors FROM ebay_listings").first();
+ const rows=await env.DB.prepare("SELECT l.product_id,l.sku,l.offer_id,l.listing_id,l.listing_status,l.marketplace_id,l.last_error,l.last_synced_at,l.updated_at,p.title,p.price,p.status AS product_status,p.review_status,p.zone FROM ebay_listings l LEFT JOIN products p ON p.id=l.product_id ORDER BY l.updated_at DESC LIMIT 500").all();
+ return {configured:ebayAppConfigured(env),missingSecrets:ebayMissingAppConfig(env),connected:Boolean(connection&&connection.connected_at),connectedAt:connection&&connection.connected_at||"",scopes:connection&&connection.scopes||"",environment:ebayMode(env),callbackUrl:url.origin+"/api/ebay/callback",settings,summary:summary||{total:0,published:0,errors:0},listings:rows.results||[]};
+}
+async function publishEbayItem(env,productId){
+ const row=await env.DB.prepare("SELECT * FROM products WHERE id=?").bind(productId).first();
+ if(!row)throw new Error("Inventory item not found.");
+ const item=toAdmin(row);
+ if(item.review_status!=="approved")throw new Error("Approve this item in OneCopy before listing it on eBay.");
+ if(item.zone==="rear_restricted")throw new Error("Restricted Rear-zone items cannot be listed on eBay.");
+ if(item.status!=="in_stock"||Number(item.quantity)<1)throw new Error("This item is not currently in stock.");
+ if(Number(item.price)<=0)throw new Error("Set a positive asking price before listing.");
+ if(!String(item.title||"").trim())throw new Error("A listing title is required.");
+ if(String(item.title).length>80)throw new Error("eBay titles are limited to 80 characters here. Shorten the inventory title before publishing.");
+ if(item.image_url&&!/^https:\/\//i.test(item.image_url))throw new Error("Image URL must use HTTPS.");
+ const settings=await loadEbaySettings(env);
+ const required=[
+  ["eBay category ID",settings&&settings.category_id],
+  ["merchant location key",settings&&settings.merchant_location_key],
+  ["fulfillment/shipping policy",settings&&settings.fulfillment_policy_id],
+  ["payment policy",settings&&settings.payment_policy_id],
+  ["return policy",settings&&settings.return_policy_id]
+ ];
+ const missing=required.filter(x=>!x[1]).map(x=>x[0]);
+ if(missing.length)throw new Error("Complete eBay setup first: "+missing.join(", ")+".");
+ if(!env.EBAY_CLIENT_ID||!env.EBAY_CLIENT_SECRET||!env.EBAY_TOKEN_ENCRYPTION_KEY)throw new Error("One or more eBay Cloudflare secrets are missing.");
+ const access=await ebayAccessToken(env);
+ const prior=await env.DB.prepare("SELECT * FROM ebay_listings WHERE product_id=?").bind(productId).first();
+ const sku=prior&&prior.sku?prior.sku:String(item.id);
+ const isbn=String(item.isbn||"").replace(/[^0-9Xx]/g,"").toUpperCase();
+ const product={title:String(item.title).trim(),description:String(item.description||("Condition: "+item.condition)).slice(0,5000),imageUrls:item.image_url?[item.image_url]:[]};
+ if(/^(?:\d{9}[\dX]|\d{13})$/.test(isbn))product.isbn=[isbn];
+ const conditions={"As New":"LIKE_NEW","Very Good":"USED_VERY_GOOD","Good":"USED_GOOD","Acceptable":"USED_ACCEPTABLE","Fair":"USED_ACCEPTABLE"};
+ const ebayCondition=conditions[item.condition]||"USED_GOOD";
+ const inventory={availability:{shipToLocationAvailability:{quantity:Math.max(1,Math.min(99999,Number(item.quantity)||1))}},condition:ebayCondition,product};
+ if(!["LIKE_NEW","NEW"].includes(ebayCondition))inventory.conditionDescription=String(item.description||("Condition: "+item.condition)).slice(0,1000);
+ const offer={
+  sku,marketplaceId:settings.marketplace_id||"EBAY_US",format:"FIXED_PRICE",
+  availableQuantity:Math.max(1,Math.min(99999,Number(item.quantity)||1)),
+  categoryId:settings.category_id,merchantLocationKey:settings.merchant_location_key,
+  listingDescription:String(item.description||("Condition: "+item.condition)).slice(0,5000),
+  listingDuration:settings.listing_duration||"GTC",
+  listingPolicies:{fulfillmentPolicyId:settings.fulfillment_policy_id,paymentPolicyId:settings.payment_policy_id,returnPolicyId:settings.return_policy_id},
+  pricingSummary:{price:{value:Number(item.price).toFixed(2),currency:settings.currency||"USD"}}
+ };
+ const now=()=>new Date().toISOString();
+ let offerId=prior&&prior.offer_id||"",listingId=prior&&prior.listing_id||"";
+ try{
+  await ebayRequest(env,"/sell/inventory/v1/inventory_item/"+encodeURIComponent(sku),{method:"PUT",body:JSON.stringify(inventory)},access);
+  if(offerId){
+   await ebayRequest(env,"/sell/inventory/v1/offer/"+encodeURIComponent(offerId),{method:"PUT",body:JSON.stringify(offer)},access);
+  }else{
+   const created=await ebayRequest(env,"/sell/inventory/v1/offer",{method:"POST",body:JSON.stringify(offer)},access);
+   offerId=String(created.data.offerId||"");
+   if(!offerId)throw new Error("eBay created an offer but did not return its offer ID.");
+  }
+  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,? ,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,offerId,listingId,listingId?"published":"draft",settings.marketplace_id,now(),now()).run();
+  if(!listingId){
+   const published=await ebayRequest(env,"/sell/inventory/v1/offer/"+encodeURIComponent(offerId)+"/publish",{method:"POST",body:"{}"},access);
+   listingId=String(published.data.listingId||"");
+   if(!listingId)throw new Error("eBay accepted the publish request but returned no listing ID. Check eBay Seller Hub before retrying.");
+  }
+  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,offerId,listingId,"published",settings.marketplace_id,now(),now()).run();
+  return {ok:true,product_id:productId,sku,offer_id:offerId,listing_id:listingId,status:"published",message:prior&&prior.listing_id?"Existing eBay listing updated.":"Listing published to eBay."};
+ }catch(e){
+  const message=String(e&&e.message||"eBay request failed").slice(0,1000);
+  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?, ?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,last_error=excluded.last_error,last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,offerId,listingId,listingId?"published":"error",settings.marketplace_id,message,now(),now()).run();
+  throw e;
+ }
+}
+
 function normal(body){
  const title=s(body.title,300);if(!title)return {error:"Item name is required."};
  const zone=zones.has(body.zone)?body.zone:"rear_restricted";
