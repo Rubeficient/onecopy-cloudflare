@@ -1,0 +1,4 @@
+# For local preview only. Never commit real secrets.
+ADMIN_PASSWORD="replace-with-a-local-test-password"
+SESSION_SECRET="use-a-random-secret-with-at-least-32-characters"
+SQUARE_ACCESS_TOKEN=""
