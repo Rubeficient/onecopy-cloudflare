@@ -74,8 +74,9 @@
      <div class="ebayfield"><label for="ebayReturn">RETURN POLICY ID</label><input id="ebayReturn" list="ebayReturnOptions" placeholder="Choose or paste policy ID"><datalist id="ebayReturnOptions"></datalist></div>
      <div class="ebayfield"><label for="ebayDuration">LISTING DURATION</label><select id="ebayDuration"><option value="GTC">Good 'Til Canceled</option></select></div>
     </div>
-    <div class="btnline"><button class="btn" id="saveEbaySettings" type="submit">Save eBay settings</button><button class="btn secondary" id="loadEbayPolicies" type="button">Load my eBay business policies</button><button class="btn secondary" id="loadEbayLocations" type="button">Find eBay inventory locations</button><button class="btn secondary" id="createEbayLocation" type="button">Register ship-from location</button></div>
+    <div class="btnline"><button class="btn" id="saveEbaySettings" type="submit">Save eBay settings</button><button class="btn secondary" id="loadEbayCategoryAspects" type="button">Load required item specifics</button><button class="btn secondary" id="loadEbayPolicies" type="button">Load my eBay business policies</button><button class="btn secondary" id="loadEbayLocations" type="button">Find eBay inventory locations</button><button class="btn secondary" id="createEbayLocation" type="button">Register ship-from location</button></div>
    </form>
+   <div id="ebayCategoryAspects" class="ebaysection hidden"><h3>Category-specific item details</h3><p class="explain">Fetched from eBay for this marketplace and category. Required fields are marked; fill them accurately. eBay may reject a listing if a required field is missing or inconsistent.</p><div id="ebayAspectFields" class="ebaygrid"></div><p class="ebay-footnote">Book Title, Author and ISBN can be prefilled from OneCopy where known. Other specifics such as format, language or publication year must come from the actual book, not guesses.</p></div>
    <div class="ebay-footnote">eBay requires an inventory location and active payment, fulfillment/shipping, and return business policies before a listing can go live. Registering a location uses the ship-from address you enter above; use your actual business shipping address, not an estimated address.</div>
   </div>
  </section>
@@ -95,7 +96,7 @@
 <section id="ordersPanel" data-panel="orders" class="hidden"><section class="panel"><div class="panel-head"><div><div class="kicker">Fulfillment</div><h2>Orders</h2><p class="explain">Orders are shown here once an order/payment workflow is connected.</p></div><span class="pill gold">CHECKOUT NOT LIVE</span></div><div id="orders" class="sub">No orders loaded.</div><div class="message">This deployment is currently a catalog and inventory prototype. It is not collecting customer payments yet.</div></section></section>
 </div></div></section>
 <script>
-var $=function(s){return document.querySelector(s)},inventoryRows=[],ebayStatusData=null,ebayPreviewItem=null,ebaySettingsLoaded=false;
+var $=function(s){return document.querySelector(s)},inventoryRows=[],ebayStatusData=null,ebayPreviewItem=null,ebaySettingsLoaded=false,ebayCategoryAspects=[];
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function fmt(v){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(v)||0)}
 function msg(el,t,err){el.textContent=t;el.classList.remove("hidden","error");if(err)el.classList.add("error")}
@@ -288,6 +289,59 @@ function renderEbayInventoryOptions(){
  if(eligible.some(function(p){return p.id===current}))select.value=current;
  if(!eligible.length)select.innerHTML='<option value="">No eligible books yet — approve an in-stock book with a price first</option>';
 }
+
+function savedEbayAspectValues(productId){
+ var row=(ebayStatusData&&ebayStatusData.listings||[]).find(function(l){return l.product_id===productId});
+ if(!row||!row.listing_aspects_json)return {};
+ try{return JSON.parse(row.listing_aspects_json)||{};}catch(e){return {};}
+}
+function autoEbayAspectValue(name,item){
+ var key=String(name||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+ if(key==="booktitle"||key==="title")return String(item&&item.title||"");
+ if(key==="author"||key==="authors")return String(item&&item.author||"");
+ if(key==="isbn")return String(item&&item.isbn||"");
+ return "";
+}
+function renderEbayAspectFields(aspects,item,saved){
+ ebayCategoryAspects=Array.isArray(aspects)?aspects:[];
+ var panel=$("#ebayCategoryAspects"),host=$("#ebayAspectFields");
+ if(!ebayCategoryAspects.length){panel.classList.add("hidden");host.innerHTML="";return;}
+ panel.classList.remove("hidden");
+ var required=ebayCategoryAspects.filter(function(a){return a.required});
+ var recommended=ebayCategoryAspects.filter(function(a){return !a.required&&String(a.usage||"").toUpperCase()==="RECOMMENDED"}).slice(0,12);
+ var visible=required.concat(recommended);
+ if(!visible.length){host.innerHTML='<div class="sub">eBay did not mark any required or recommended item specifics for this category.</div>';return;}
+ host.innerHTML=visible.map(function(a,i){
+  var name=a.name||("Specific "+(i+1)),value=saved&&saved[name];
+  if(Array.isArray(value))value=value.join(" | ");
+  if(value==null||value==="")value=autoEbayAspectValue(name,item);
+  var datalistId="ebayAspectAllowed"+i;
+  var list=(a.values||[]).map(function(v){return '<option value="'+esc(v)+'"></option>'}).join("");
+  var tip=(a.required?"eBay requires this item specific for the selected category. ":"eBay recommends this item specific for better listing completeness. ")+"Enter facts from this copy. "+((a.cardinality||"").toUpperCase()==="MULTI"?"Separate multiple values with |. ":"")+"Use the suggested values if applicable.";
+  return '<div class="ebayfield"><label>'+esc(name)+(a.required?' <span class="pill gold">REQUIRED</span>':' <span class="pill">RECOMMENDED</span>')+'</label><input class="ebay-aspect-value" data-aspect-name="'+esc(name)+'" list="'+datalistId+'" value="'+esc(value)+'" title="'+esc(tip)+'" '+(a.required?'aria-required="true"':'')+'><datalist id="'+datalistId+'">'+list+'</datalist><small>'+esc(tip)+'</small></div>';
+ }).join("");
+}
+function getEbayAspectValues(){
+ var result={};
+ document.querySelectorAll("#ebayAspectFields .ebay-aspect-value").forEach(function(input){
+  var value=input.value.trim();if(!value)return;
+  result[input.dataset.aspectName]=value.split("|").map(function(v){return v.trim()}).filter(Boolean);
+ });
+ return result;
+}
+async function fetchEbayCategoryAspects(){
+ var category=$("#ebayCategory").value.trim(),market=$("#ebayMarketplace").value;
+ if(!category){notice("Enter the eBay category ID first.",true);return;}
+ var button=$("#loadEbayCategoryAspects");button.disabled=true;button.textContent="Loading item specifics…";
+ try{
+  var d=await api("/api/admin/ebay/category-aspects?marketplace_id="+encodeURIComponent(market)+"&category_id="+encodeURIComponent(category));
+  var id=$("#ebayProductSelect").value,item=inventoryRows.find(function(p){return p.id===id});
+  renderEbayAspectFields(d.aspects||[],item,savedEbayAspectValues(id));
+  notice("Loaded eBay category rules: "+ebayCategoryAspects.filter(function(a){return a.required}).length+" required and "+ebayCategoryAspects.filter(function(a){return !a.required&&String(a.usage||"").toUpperCase()==="RECOMMENDED"}).length+" recommended item specifics.");
+  if(ebayPreviewItem)showEbayPreview(ebayPreviewItem);
+ }catch(e){notice(e.message,true)}finally{button.disabled=false;button.textContent="Load required item specifics"}
+}
+
 function showEbayPreview(item){
  ebayPreviewItem=item||null;
  var box=$("#ebayPreview");
@@ -295,6 +349,9 @@ function showEbayPreview(item){
  box.classList.remove("hidden");
  var listingTitle=$("#ebayListingTitle").value.trim()||String(item.title||"");
  var issues=[];
+ if(!ebayCategoryAspects.length)issues.push("Load eBay required item specifics for the selected category before publishing.");
+ var aspectValues=getEbayAspectValues();
+ ebayCategoryAspects.filter(function(a){return a.required}).forEach(function(a){if(!(aspectValues[a.name]&&aspectValues[a.name].length)&&!autoEbayAspectValue(a.name,item))issues.push("Required eBay item specific missing: "+a.name+".")});
  if(!listingTitle)issues.push("An eBay listing title is required.");
  if(listingTitle.length>80)issues.push("eBay title is over 80 characters. Shorten the eBay-specific title above; the OneCopy master title will remain unchanged.");
  if(!item.image_url)issues.push("No item photo is recorded. eBay categories commonly require a photo; add a clear HTTPS image URL before publishing.");
@@ -355,6 +412,7 @@ $("#copyEbayCallback").addEventListener("click",async function(){
  try{await navigator.clipboard.writeText($("#ebayCallbackUrl").textContent);notice("eBay callback URL copied.");}
  catch(e){notice("Select and copy the callback URL shown above.",true)}
 });
+$("#loadEbayCategoryAspects").addEventListener("click",fetchEbayCategoryAspects);
 $("#loadEbayPolicies").addEventListener("click",async function(){
  try{
   var d=await api("/api/admin/ebay/policies");
@@ -393,6 +451,7 @@ $("#ebayProductSelect").addEventListener("change",function(){
  var id=this.value,item=inventoryRows.find(function(p){return p.id===id});
  var match=(ebayStatusData&&ebayStatusData.listings||[]).find(function(l){return l.product_id===id});
  $("#ebayListingTitle").value=item?((match&&match.listing_title)||(String(item.title||"").length<=80?item.title:"")):"";
+ renderEbayAspectFields(ebayCategoryAspects,item,savedEbayAspectValues(id));
  ebayPreviewItem=null;showEbayPreview(null);
 });
 $("#ebayListingTitle").addEventListener("input",function(){if(ebayPreviewItem)showEbayPreview(ebayPreviewItem)});
@@ -401,7 +460,7 @@ $("#publishEbayItem").addEventListener("click",async function(){
  var oldListing=(ebayStatusData&&ebayStatusData.listings||[]).find(function(x){return x.product_id===item.id&&x.listing_status==="published"});var actionText=oldListing?"Update the existing live eBay listing":"Publish this item as a new eBay listing";if(!window.confirm(actionText+" at "+fmt(item.price)+"? This will affect a real public listing."))return;
  var btn=$("#publishEbayItem");btn.disabled=true;btn.textContent="Publishing to eBay…";
  try{
-  var result=await api("/api/admin/ebay/products/"+encodeURIComponent(item.id)+"/publish",{method:"POST",body:JSON.stringify({listing_title:$("#ebayListingTitle").value.trim()})});
+  var result=await api("/api/admin/ebay/products/"+encodeURIComponent(item.id)+"/publish",{method:"POST",body:JSON.stringify({listing_title:$("#ebayListingTitle").value.trim(),listing_aspects:getEbayAspectValues()})});
   await loadEbayPanel();
   notice(result.message+" OneCopy ID "+item.id+" · eBay listing "+result.listing_id+".");
   $("#ebayProductSelect").value=item.id;showEbayPreview(item);
