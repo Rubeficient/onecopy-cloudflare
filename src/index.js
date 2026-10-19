@@ -10,7 +10,7 @@ function unb64u(str){str=str.replace(/-/g,"+").replace(/_/g,"/");str+="=".repeat
 async function sign(value,secret){const key=await crypto.subtle.importKey("raw",enc.encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);return b64u(new Uint8Array(await crypto.subtle.sign("HMAC",key,enc.encode(value))));}
 async function session(secret){const p=b64u(enc.encode(JSON.stringify({exp:Date.now()+28800000})));return p+"."+await sign(p,secret);}
 async function auth(req,secret){if(!secret)return false;const c=req.headers.get("Cookie")||"",match=c.match(/(?:^|;\s*)onecopy_session=([^;]+)/);if(!match)return false;const a=match[1].split(".");if(a.length!==2)return false;try{if(await sign(a[0],secret)!==a[1])return false;return JSON.parse(new TextDecoder().decode(unb64u(a[0]))).exp>Date.now();}catch{return false;}}
-const cookie=t=>"onecopy_session="+t+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800";
+const cookie=t=>"onecopy_session="+t+"; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=28800";
 async function read(req){try{return await req.json();}catch{return null;}}
 
 /*
@@ -328,7 +328,7 @@ async function api(req,env,url){
   const b=await read(req);if(!b||b.password!==env.ADMIN_PASSWORD)return json({error:"Incorrect password."},401);
   return json({ok:true},200,{"set-cookie":cookie(await session(env.SESSION_SECRET))});
  }
- if(p==="/api/admin/logout"&&method==="POST")return json({ok:true},200,{"set-cookie":"onecopy_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"});
+ if(p==="/api/admin/logout"&&method==="POST")return json({ok:true},200,{"set-cookie":"onecopy_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"});
  if(p.startsWith("/api/admin/")){
   if(!await auth(req,env.SESSION_SECRET))return json({error:"Please sign in to the admin panel."},401);
   await ensureSchema(env);
@@ -372,7 +372,7 @@ async function api(req,env,url){
     await ebayRequest(env,"/sell/inventory/v1/location/"+key,{method:"GET"},access);
     return json({ok:true,exists:true,message:"This eBay inventory location already exists."});
    }catch(e){if(e.status!==404)throw e;}
-   const loc={name:settings.location_name||"Magic Door Books",locationTypes:["WAREHOUSE"],location:{address:{city:settings.city,stateOrProvince:settings.state_or_province,country:settings.country}}};
+   const loc={name:settings.location_name||"Magic Door Books",merchantLocationStatus:"ENABLED",locationTypes:["WAREHOUSE"],location:{address:{city:settings.city,stateOrProvince:settings.state_or_province,country:settings.country}}};
    if(settings.address_line1)loc.location.address.addressLine1=settings.address_line1;
    if(settings.postal_code)loc.location.address.postalCode=settings.postal_code;
    await ebayRequest(env,"/sell/inventory/v1/location/"+key,{method:"POST",body:JSON.stringify(loc)},access);
