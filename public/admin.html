@@ -98,7 +98,7 @@ var fieldHelp={
 /* Portable CSV backup for later channel mapping; not itself an eBay/Amazon upload template. */
 function csvQuote(value){
  var s=String(value==null?"":value);
- if(/^[=+@\\-\\t\\r]/.test(s))s="'"+s;
+ if(/^\s*[=+\-@]/.test(s))s="'"+s;
  return '"'+s.replace(/"/g,'""')+'"';
 }
 $("#exportCsv").addEventListener("click",function(){
@@ -117,7 +117,7 @@ $("#exportCsv").addEventListener("click",function(){
   if(f[1]==="online_published"||["signed","firstEdition","special"].includes(f[1]))value=value?"Yes":"No";
   return csvQuote(value);
  }).join(","))});
- var blob=new Blob(["\\uFEFF"+lines.join("\\r\\n")],{type:"text/csv;charset=utf-8;"});
+ var blob=new Blob(["\uFEFF"+lines.join("\r\n")],{type:"text/csv;charset=utf-8;"});
  var url=URL.createObjectURL(blob),a=document.createElement("a");
  a.href=url;a.download="onecopy-inventory-"+new Date().toISOString().slice(0,10)+".csv";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
  notice("Exported "+inventoryRows.length+" inventory records to CSV. Keep the file private; it includes internal notes and costs.");
