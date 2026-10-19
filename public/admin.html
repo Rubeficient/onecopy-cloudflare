@@ -372,12 +372,14 @@ function renderCaptureResult(r){
   return '<article class="capture-evidence"><div class="capture-evidence-head"><div>'+link+'<small>'+esc(label)+' · '+esc(x.seller||"Seller/source not identified")+(x.date?" · "+esc(x.date):"")+'</small></div><div class="capture-evidence-price">'+(x.price===null||x.price===undefined?"":esc(x.currency||"USD")+" "+fmt(x.price))+'</div></div><small>Condition: '+esc(x.condition||"Not stated")+'. '+esc(x.comparability||"Similarity not assessed.")+'</small></article>';
  }).join("");
  var qs=(r.searchQueries||[]).map(function(q){return '<a href="https://www.google.com/search?q='+encodeURIComponent(q)+'" target="_blank" rel="noopener noreferrer">'+esc(q)+'</a>'}).join("");
+ var sourceHtml=(r.researchSources||[]).filter(function(x){return x.url&&x.title}).map(function(x){return '<div class="capture-evidence"><a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">'+esc(x.title)+'</a><small>'+esc(x.url)+'</small></div>'}).join("");
  var reasons=(r.reviewReasons||[]).length?'<div class="capture-review-box"><strong>Review flags</strong><br>'+r.reviewReasons.map(esc).join("<br>")+'</div>':"";
  el.innerHTML='<div class="capture-result-head"><h3>'+title+'</h3><div class="capture-tagrow">'+tags+'</div></div>'+
   '<div class="capture-meta-grid">'+metaHtml+'</div>'+
   '<p class="capture-description">'+esc(r.description||"No reliable description generated.")+'</p>'+
   prices+'<div class="capture-review-box"><strong>Valuation basis: '+esc(r.valuationBasis||"none")+'</strong><br>'+esc(r.valuationNotes||"No pricing rationale supplied.")+'</div>'+
   (evid?'<div class="capture-subheading">Market / catalog evidence</div>'+evid:'<div class="capture-subheading">Market evidence</div><p class="capture-description">No comparable source was returned. Do not infer current value from visual similarity alone. Use the search suggestions below or set price manually.</p>')+
+  (sourceHtml?'<div class="capture-subheading">Web sources consulted</div>'+sourceHtml:"")+
   (qs?'<div class="capture-subheading">Follow-up searches</div><div class="capture-query-links">'+qs+'</div>':"")+
   reasons+'<div class="capture-disclaimer">These findings can be wrong or incomplete. Current asking prices are not realized sales. Precious metals, gemstones, signatures, provenance and antique editions may need specialist authentication. Confirm facts before listing.</div>';
  $("#captureTransfer").hidden=false;
@@ -408,7 +410,7 @@ $("#captureAnalyze").addEventListener("click",async function(){
  $("#captureResultBody").hidden=true;$("#captureTransfer").hidden=true;
  try{
   var d=await api("/api/admin/item-capture/analyze",{method:"POST",body:JSON.stringify({images:captureImages.map(function(x){return {dataUrl:x.dataUrl,label:x.label}}),itemType:$("#captureType").value,notes:$("#captureNotes").value})});
-  captureResult=d.result;renderCaptureResult(captureResult);setCaptureStatus((d.webResearchUsed?"AI analysis complete; web research was used.":"AI analysis complete. Check the evidence links and uncertainty notes.")+" "+d.disclaimer,"good");
+  captureResult=d.result;captureResult.researchSources=d.researchSources||[];renderCaptureResult(captureResult);setCaptureStatus((d.webResearchUsed?"AI analysis complete; web research was used.":"AI analysis complete. Check the evidence links and uncertainty notes.")+" "+d.disclaimer,"good");
  }catch(e){$("#captureIdle").hidden=false;$("#captureIdle").querySelector("strong").textContent="Analysis couldn't complete";$("#captureIdle").querySelector("p").textContent=e.message||"Check setup and try again.";setCaptureStatus(e.message||"Analysis failed.","error")}
  finally{button.disabled=captureImages.length===0;button.textContent="Identify item & research matches →"}
 });
