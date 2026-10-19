@@ -239,6 +239,7 @@ async function publishEbayItem(env,productId){
  const row=await env.DB.prepare("SELECT * FROM products WHERE id=?").bind(productId).first();
  if(!row)throw new Error("Inventory item not found.");
  const item=toAdmin(row);
+ if(String(item.category||"").toLowerCase()!=="book")throw new Error("The first eBay connector is configured for books. Non-book items need their own category mapping before listing.");
  if(item.review_status!=="approved")throw new Error("Approve this item in OneCopy before listing it on eBay.");
  if(item.zone==="rear_restricted")throw new Error("Restricted Rear-zone items cannot be listed on eBay.");
  if(item.status!=="in_stock"||Number(item.quantity)<1)throw new Error("This item is not currently in stock.");
@@ -277,7 +278,7 @@ async function publishEbayItem(env,productId){
   pricingSummary:{price:{value:Number(item.price).toFixed(2),currency:settings.currency||"USD"}}
  };
  const now=()=>new Date().toISOString();
- let offerId=prior&&prior.offer_id||"",listingId=prior&&prior.listing_id||"";
+ let offerId=prior&&prior.offer_id||"",listingId=prior&&prior.listing_status==="published"&&prior.listing_id?prior.listing_id:"";
  try{
   await ebayRequest(env,"/sell/inventory/v1/inventory_item/"+encodeURIComponent(sku),{method:"PUT",body:JSON.stringify(inventory)},access);
   if(offerId){
