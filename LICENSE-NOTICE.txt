@@ -1,0 +1,3 @@
+OneCopy software starter created for the OneCopy / Magic Door Books project.
+All rights reserved to the project owner for this custom application code.
+Third-party libraries and services remain subject to their own licenses and terms.
