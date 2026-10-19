@@ -251,7 +251,8 @@ async function publishEbayItem(env,productId,titleOverride){
  if(!String(item.title||"").trim())throw new Error("A listing title is required.");
  if(!listingTitle)throw new Error("Enter an eBay listing title.");
  if(listingTitle.length>80)throw new Error("eBay listing titles are limited to 80 characters. Shorten the eBay-specific title; the full OneCopy title will be preserved.");
- if(item.image_url&&!/^https:\/\//i.test(item.image_url))throw new Error("Image URL must use HTTPS.");
+ if(!item.image_url)throw new Error("Add a clear HTTPS photo URL for the actual book before publishing. eBay requires at least one listing image.");
+ if(!/^https:\/\//i.test(item.image_url))throw new Error("Image URL must use HTTPS.");
  const settings=await loadEbaySettings(env);
  const required=[
   ["eBay category ID",settings&&settings.category_id],
@@ -272,7 +273,7 @@ async function publishEbayItem(env,productId,titleOverride){
  const conditions={"As New":"LIKE_NEW","Very Good":"USED_VERY_GOOD","Good":"USED_GOOD","Acceptable":"USED_ACCEPTABLE","Fair":"USED_ACCEPTABLE"};
  const ebayCondition=conditions[item.condition]||"USED_GOOD";
  const inventory={availability:{shipToLocationAvailability:{quantity:Math.max(1,Math.min(99999,Number(item.quantity)||1))}},condition:ebayCondition,product};
- if(!["LIKE_NEW","NEW"].includes(ebayCondition))inventory.conditionDescription=String(item.description||("Condition: "+item.condition)).slice(0,1000);
+ if(!["LIKE_NEW","NEW"].includes(ebayCondition))inventory.conditionDescription=("Condition: "+String(item.condition||"Not specified")).slice(0,1000);
  const offer={
   sku,marketplaceId:settings.marketplace_id||"EBAY_US",format:"FIXED_PRICE",
   availableQuantity:Math.max(1,Math.min(99999,Number(item.quantity)||1)),
