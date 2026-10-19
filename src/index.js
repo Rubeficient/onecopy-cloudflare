@@ -12,6 +12,72 @@ async function session(secret){const p=b64u(enc.encode(JSON.stringify({exp:Date.
 async function auth(req,secret){if(!secret)return false;const c=req.headers.get("Cookie")||"",match=c.match(/(?:^|;\s*)onecopy_session=([^;]+)/);if(!match)return false;const a=match[1].split(".");if(a.length!==2)return false;try{if(await sign(a[0],secret)!==a[1])return false;return JSON.parse(new TextDecoder().decode(unb64u(a[0]))).exp>Date.now();}catch{return false;}}
 const cookie=t=>"onecopy_session="+t+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800";
 async function read(req){try{return await req.json();}catch{return null;}}
+
+/*
+ * Make the first run safe: initialize an empty D1 database automatically,
+ * and add any newer columns to an existing table without deleting its data.
+ */
+async function ensureSchema(env){
+ await env.DB.prepare(`CREATE TABLE IF NOT EXISTS products (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL DEFAULT '',
+  isbn TEXT NOT NULL DEFAULT '', category TEXT NOT NULL DEFAULT 'Book',
+  description TEXT NOT NULL DEFAULT '', condition TEXT NOT NULL DEFAULT 'Good',
+  price REAL NOT NULL DEFAULT 0, msrp REAL NOT NULL DEFAULT 0,
+  stock_mode TEXT NOT NULL DEFAULT 'unique', quantity INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'in_stock', zone TEXT NOT NULL DEFAULT 'rear_restricted',
+  location TEXT NOT NULL DEFAULT '', review_status TEXT NOT NULL DEFAULT 'needs_partner_review',
+  online_published INTEGER NOT NULL DEFAULT 0, image_url TEXT NOT NULL DEFAULT '',
+  item_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+ )`).run();
+ await env.DB.prepare(`CREATE TABLE IF NOT EXISTS orders (
+  id TEXT PRIMARY KEY, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  status TEXT NOT NULL, payment_status TEXT NOT NULL,
+  fulfillment_status TEXT NOT NULL DEFAULT 'unfulfilled',
+  customer_json TEXT NOT NULL DEFAULT '{}', items_json TEXT NOT NULL DEFAULT '[]',
+  subtotal REAL NOT NULL DEFAULT 0, shipping REAL NOT NULL DEFAULT 0,
+  total REAL NOT NULL DEFAULT 0, inventory_reserved INTEGER NOT NULL DEFAULT 1,
+  notes TEXT NOT NULL DEFAULT ''
+ )`).run();
+ await env.DB.prepare(`CREATE TABLE IF NOT EXISTS admin_login_attempts (
+  ip_hash TEXT PRIMARY KEY, attempt_count INTEGER NOT NULL DEFAULT 0,
+  window_started_ms INTEGER NOT NULL
+ )`).run();
+ const additions={
+  products:{
+   author:"TEXT NOT NULL DEFAULT ''", isbn:"TEXT NOT NULL DEFAULT ''",
+   category:"TEXT NOT NULL DEFAULT 'Book'", description:"TEXT NOT NULL DEFAULT ''",
+   condition:"TEXT NOT NULL DEFAULT 'Good'", price:"REAL NOT NULL DEFAULT 0",
+   msrp:"REAL NOT NULL DEFAULT 0", stock_mode:"TEXT NOT NULL DEFAULT 'unique'",
+   quantity:"INTEGER NOT NULL DEFAULT 1", status:"TEXT NOT NULL DEFAULT 'in_stock'",
+   zone:"TEXT NOT NULL DEFAULT 'rear_restricted'", location:"TEXT NOT NULL DEFAULT ''",
+   review_status:"TEXT NOT NULL DEFAULT 'needs_partner_review'",
+   online_published:"INTEGER NOT NULL DEFAULT 0", image_url:"TEXT NOT NULL DEFAULT ''",
+   item_json:"TEXT NOT NULL DEFAULT '{}'", created_at:"TEXT NOT NULL DEFAULT ''",
+   updated_at:"TEXT NOT NULL DEFAULT ''"
+  },
+  orders:{
+   created_at:"TEXT NOT NULL DEFAULT ''", updated_at:"TEXT NOT NULL DEFAULT ''",
+   status:"TEXT NOT NULL DEFAULT 'pending'", payment_status:"TEXT NOT NULL DEFAULT 'unpaid'",
+   fulfillment_status:"TEXT NOT NULL DEFAULT 'unfulfilled'",
+   customer_json:"TEXT NOT NULL DEFAULT '{}'", items_json:"TEXT NOT NULL DEFAULT '[]'",
+   subtotal:"REAL NOT NULL DEFAULT 0", shipping:"REAL NOT NULL DEFAULT 0",
+   total:"REAL NOT NULL DEFAULT 0", inventory_reserved:"INTEGER NOT NULL DEFAULT 1",
+   notes:"TEXT NOT NULL DEFAULT ''"
+  }
+ };
+ for(const table of Object.keys(additions)){
+  const info=await env.DB.prepare("PRAGMA table_info("+table+")").all();
+  const present=new Set((info.results||[]).map(c=>c.name));
+  for(const [name,definition] of Object.entries(additions[table])){
+   if(!present.has(name)) await env.DB.prepare("ALTER TABLE "+table+" ADD COLUMN "+name+" "+definition).run();
+  }
+ }
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_products_public ON products (online_published, status, category)").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_products_title ON products (title)").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_products_zone ON products (zone, review_status)").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_products_isbn ON products (isbn)").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders (created_at DESC)").run();
+}
 function normal(body){
  const title=s(body.title,300);if(!title)return {error:"Item name is required."};
  const zone=zones.has(body.zone)?body.zone:"rear_restricted";
@@ -33,6 +99,7 @@ async function api(req,env,url){
  if(p==="/api/admin/logout"&&method==="POST")return json({ok:true},200,{"set-cookie":"onecopy_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"});
  if(p.startsWith("/api/admin/")){
   if(!await auth(req,env.SESSION_SECRET))return json({error:"Please sign in to the admin panel."},401);
+  await ensureSchema(env);
   if(p==="/api/admin/products"&&method==="GET"){const r=await env.DB.prepare("SELECT * FROM products ORDER BY created_at DESC LIMIT 1000").all();return json({products:(r.results||[]).map(toAdmin)});}
   if(p==="/api/admin/products"&&method==="POST"){
    const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);const x=normal(b);if(x.error)return json({error:x.error},400);
@@ -55,6 +122,7 @@ async function api(req,env,url){
   return json({error:"Admin API route not found."},404);
  }
  if(p==="/api/products"&&method==="GET"){
+  await ensureSchema(env);
   const where=["online_published=1","status='in_stock'","review_status='approved'","zone!='rear_restricted'","quantity>0"],args=[];
   const q=s(url.searchParams.get("q"),120).toLowerCase(),cat=s(url.searchParams.get("category"),100);
   if(q){where.push("(LOWER(title) LIKE ? OR LOWER(author) LIKE ? OR LOWER(isbn) LIKE ? OR LOWER(description) LIKE ?)");const term="%"+q+"%";args.push(term,term,term,term);}
@@ -67,7 +135,7 @@ async function api(req,env,url){
 export default {async fetch(req,env){
  const url=new URL(req.url);
  try{
-  if(url.pathname==="/health"){const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.7.1",inventory:"empty by default"});}
+  if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.7.1",inventory:"empty by default"});}
   if(url.pathname==="/admin"||url.pathname==="/admin/")return env.ASSETS.fetch(new Request(new URL("/admin.html",url),{method:"GET"}));
   if(url.pathname.startsWith("/api/"))return await api(req,env,url);
   return env.ASSETS.fetch(req);
