@@ -267,9 +267,15 @@ function cleanListingAspects(input,definitions,item){
  }catch{}
  let prior={};
  if(item&&item.listing_aspects_json){try{prior=JSON.parse(item.listing_aspects_json)||{};}catch{}}
- const combined={...prior};
+ const validNames=new Set((definitions||[]).map(d=>d.name));
+ const combined={};
+ for(const [name,value] of Object.entries(prior)){
+  if(!validNames.has(name))continue;
+  const values=(Array.isArray(value)?value:String(value??"").split("|")).map(v=>s(v,200)).filter(Boolean).slice(0,10);
+  if(values.length)combined[name]=values;
+ }
  for(const [name,value] of Object.entries(supplied)){
-  if(typeof name!=="string"||!name.trim()||name.length>100)continue;
+  if(typeof name!=="string"||!name.trim()||name.length>100||!validNames.has(name))continue;
   const values=(Array.isArray(value)?value:String(value??"").split("|")).map(v=>s(v,200)).filter(Boolean).slice(0,10);
   if(values.length)combined[name]=values;
  }
@@ -321,7 +327,7 @@ async function publishEbayItem(env,productId,titleOverride,submittedAspects){
  if(missingAspects.length)throw new Error("Fill the required eBay item specifics: "+missingAspects.map(a=>a.name).join(", ")+". Use Load required item specifics in the preview panel.");
  const sku=prior&&prior.sku?prior.sku:String(item.id);
  const isbn=String(item.isbn||"").replace(/[^0-9Xx]/g,"").toUpperCase();
- const product={title:listingTitle,description:String(item.description||("Condition: "+item.condition)).slice(0,5000),imageUrls:item.image_url?[item.image_url]:[],aspects:{"Book Title":[String(item.title).slice(0,200)],...(item.author?{Author:[String(item.author).slice(0,200)]}:{}),...listingAspects}};
+ const product={title:listingTitle,description:String(item.description||("Condition: "+item.condition)).slice(0,5000),imageUrls:item.image_url?[item.image_url]:[],aspects:listingAspects};
  if(/^(?:\d{9}[\dX]|\d{13})$/.test(isbn))product.isbn=[isbn];
  const conditions={"As New":"LIKE_NEW","Very Good":"USED_VERY_GOOD","Good":"USED_GOOD","Acceptable":"USED_ACCEPTABLE","Fair":"USED_ACCEPTABLE"};
  const ebayCondition=conditions[item.condition]||"USED_GOOD";
