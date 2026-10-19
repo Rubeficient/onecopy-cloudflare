@@ -432,6 +432,15 @@ function normal(body){
 function toAdmin(row){let x={};try{x=JSON.parse(row.item_json||"{}");}catch{}return {...row,...x,item_json:undefined,online_published:Boolean(row.online_published)};}
 async function api(req,env,url){
  const p=url.pathname,method=req.method.toUpperCase();
+
+ if(p==="/api/storefront/theme"&&method==="GET"){
+  await ensureSchema(env);
+  const row=await env.DB.prepare("SELECT id,name,theme_json FROM storefront_skins WHERE is_active=1 LIMIT 1").first();
+  let theme=DEFAULT_THEME;
+  if(row){try{theme=normalizeTheme(JSON.parse(row.theme_json||"{}"));}catch{theme=normalizeTheme(DEFAULT_THEME);}theme.themeId=row.id;theme.themeName=row.name;}
+  return json({theme});
+ }
+
  if(p==="/api/admin/login"&&method==="POST"){
   if(!env.ADMIN_PASSWORD||!env.SESSION_SECRET)return json({error:"Admin setup incomplete. Set ADMIN_PASSWORD and SESSION_SECRET in Cloudflare Worker secrets."},503);
   const b=await read(req);if(!b||b.password!==env.ADMIN_PASSWORD)return json({error:"Incorrect password."},401);
@@ -441,6 +450,47 @@ async function api(req,env,url){
  if(p.startsWith("/api/admin/")){
   if(!await auth(req,env.SESSION_SECRET))return json({error:"Please sign in to the admin panel."},401);
   await ensureSchema(env);
+
+
+  if(p==="/api/admin/themes"&&method==="GET"){
+   const rows=await env.DB.prepare("SELECT id,name,theme_json,is_active,created_at,updated_at FROM storefront_skins ORDER BY is_active DESC,name ASC").all();
+   const skins=(rows.results||[]).map(row=>{let theme={};try{theme=normalizeTheme(JSON.parse(row.theme_json||"{}"));}catch{theme=normalizeTheme(DEFAULT_THEME);}theme.themeId=row.id;theme.themeName=row.name;return {id:row.id,name:row.name,is_active:Boolean(row.is_active),created_at:row.created_at,updated_at:row.updated_at,theme};});
+   return json({skins,activeId:(skins.find(x=>x.is_active)||{}).id||DEFAULT_THEME.themeId,defaults:normalizeTheme(DEFAULT_THEME)});
+  }
+  if(p==="/api/admin/themes"&&method==="POST"){
+   const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);
+   const name=s(b.name||b.theme&&b.theme.themeName||"My custom skin",100)||"My custom skin";
+   const id="skin-"+crypto.randomUUID().replace(/-/g,"").slice(0,12).toLowerCase();
+   const theme=normalizeTheme({...b.theme,themeId:id,themeName:name});
+   const now=new Date().toISOString();
+   await env.DB.prepare("INSERT INTO storefront_skins (id,name,theme_json,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?)").bind(id,name,JSON.stringify(theme),0,now,now).run();
+   return json({ok:true,id,name,theme},201);
+  }
+  const themeMatch=p.match(/^\/api\/admin\/themes\/([^/]+)$/);
+  if(themeMatch&&method==="PUT"){
+   const id=decodeURIComponent(themeMatch[1]),b=await read(req);if(!b)return json({error:"Invalid JSON."},400);
+   const old=await env.DB.prepare("SELECT id,name,is_active FROM storefront_skins WHERE id=?").bind(id).first();
+   if(!old)return json({error:"Saved skin not found."},404);
+   const name=s(b.name||b.theme&&b.theme.themeName||old.name,100)||old.name;
+   const theme=normalizeTheme({...b.theme,themeId:id,themeName:name});
+   const now=new Date().toISOString();
+   await env.DB.prepare("UPDATE storefront_skins SET name=?,theme_json=?,updated_at=? WHERE id=?").bind(name,JSON.stringify(theme),now,id).run();
+   return json({ok:true,id,name,theme,is_active:Boolean(old.is_active)});
+  }
+  const activateThemeMatch=p.match(/^\/api\/admin\/themes\/([^/]+)\/activate$/);
+  if(activateThemeMatch&&method==="POST"){
+   const id=decodeURIComponent(activateThemeMatch[1]);
+   const target=await env.DB.prepare("SELECT id,name,theme_json FROM storefront_skins WHERE id=?").bind(id).first();
+   if(!target)return json({error:"Saved skin not found."},404);
+   const now=new Date().toISOString();
+   await env.DB.batch([
+    env.DB.prepare("UPDATE storefront_skins SET is_active=0,updated_at=?").bind(now),
+    env.DB.prepare("UPDATE storefront_skins SET is_active=1,updated_at=? WHERE id=?").bind(now,id)
+   ]);
+   let theme={};try{theme=normalizeTheme(JSON.parse(target.theme_json||"{}"));}catch{theme=normalizeTheme(DEFAULT_THEME);}
+   theme.themeId=id;theme.themeName=target.name;
+   return json({ok:true,id,name:target.name,theme,message:"Skin is now active on the public storefront."});
+  }
 
   if(p==="/api/admin/ebay/status"&&method==="GET")return json(await ebayApiSetupStatus(env,url));
   if(p==="/api/admin/ebay/settings"&&method==="GET")return json({settings:await loadEbaySettings(env)});
