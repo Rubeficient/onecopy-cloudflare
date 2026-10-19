@@ -85,7 +85,9 @@ function normal(body){
  const status=statuses.has(body.status)?body.status:"in_stock";
  const raw=Number.parseInt(body.quantity,10);const quantity=status==="sold"?0:Math.max(0,Math.min(100000,Number.isFinite(raw)?raw:1));
  const published=Boolean(body.online_published)&&zone!=="rear_restricted"&&review==="approved"&&status==="in_stock"&&quantity>0;
- const extra={cost:m(body.cost),cpv:m(body.cpv),tpv:m(body.tpv),edition:s(body.edition,500),signed:Boolean(body.signed),firstEdition:Boolean(body.first_edition),special:Boolean(body.special),notes:s(body.notes,3000)};
+ const confidence=["low","medium","high"].includes(body.valuation_confidence)?body.valuation_confidence:"low";
+ const basis=["none","sold_comps","catalog","internal_sales","appraisal","partner_judgment"].includes(body.valuation_basis)?body.valuation_basis:"none";
+ const extra={cost:m(body.cost),cpv:m(body.cpv),tpv:m(body.tpv),edition:s(body.edition,500),signed:Boolean(body.signed),firstEdition:Boolean(body.first_edition),special:Boolean(body.special),notes:s(body.notes,3000),market_comps:s(body.market_comps,3000),valuation_basis:basis,valuation_confidence:confidence};
  return {title,author:s(body.author,300),isbn:s(body.isbn,40),category:s(body.category||"Book",100),description:s(body.description,5000),condition:s(body.condition||"Good",100),price:m(body.price),msrp:m(body.msrp),stock_mode:body.stock_mode==="quantity"?"quantity":"unique",quantity,status,zone,location:s(body.location,200),review_status:review,online_published:published?1:0,image_url:s(body.image_url,2000),item_json:JSON.stringify(extra)};
 }
 function toAdmin(row){let x={};try{x=JSON.parse(row.item_json||"{}");}catch{}return {...row,...x,item_json:undefined,online_published:Boolean(row.online_published)};}
