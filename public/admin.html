@@ -82,7 +82,7 @@
  <section class="panel">
   <div class="panel-head"><div><div class="kicker">Review before publishing</div><h2>Create an eBay listing</h2><p class="explain">Choose an approved OneCopy record to preview its eBay fields before sending anything live.</p></div><span class="pill">FIXED-PRICE LISTING</span></div>
   <div class="ebayfield"><label for="ebayProductSelect">APPROVED INVENTORY ITEM</label><select id="ebayProductSelect"><option value="">Load eligible inventory…</option></select><small>Only approved, in-stock, non-restricted items with a positive asking price are eligible. Special and rare books still need partner review before approval.</small></div>
-  <div class="btnline"><button class="btn secondary" id="previewEbayItem" type="button">Preview listing</button><button class="btn" id="publishEbayItem" type="button" disabled>Publish to eBay →</button></div>
+  <div class="ebayfield"><label for="ebayListingTitle">EBAY LISTING TITLE (OPTIONAL OVERRIDE)</label><input id="ebayListingTitle" maxlength="80" placeholder="Leave blank to use the master title if it fits"><small>Keep the complete book title in OneCopy. Use a shorter marketplace title here when needed; this does not change the master inventory record.</small></div><div class="btnline"><button class="btn secondary" id="previewEbayItem" type="button">Preview listing</button><button class="btn" id="publishEbayItem" type="button" disabled>Publish to eBay →</button></div>
   <div id="ebayPreview" class="ebaypreview hidden"></div>
   <p class="ebay-footnote"><strong>Important:</strong> Publishing can create a real, public eBay listing. The first integration manages the listing you publish here; it does not yet automatically import eBay orders or synchronize sales from other channels. Until order synchronization is built, mark sold items promptly and withdraw their active eBay listing when appropriate.</p>
  </section>
@@ -293,14 +293,16 @@ function showEbayPreview(item){
  var box=$("#ebayPreview");
  if(!item){box.classList.add("hidden");$("#publishEbayItem").disabled=true;return;}
  box.classList.remove("hidden");
+ var listingTitle=$("#ebayListingTitle").value.trim()||String(item.title||"");
  var issues=[];
- if(String(item.title||"").length>80)issues.push("Title is over eBay's 80-character title limit. Shorten the item title in OneCopy before publishing.");
+ if(!listingTitle)issues.push("An eBay listing title is required.");
+ if(listingTitle.length>80)issues.push("eBay title is over 80 characters. Shorten the eBay-specific title above; the OneCopy master title will remain unchanged.");
  if(!item.image_url)issues.push("No item photo is recorded. eBay categories commonly require a photo; add a clear HTTPS image URL before publishing.");
  if(item.image_url&&!/^https:\/\//i.test(item.image_url))issues.push("The image URL must use HTTPS.");
  if(!ebayStatusData||!ebayStatusData.connected)issues.push("Connect an eBay seller account first.");
  var s=ebayStatusData&&ebayStatusData.settings||{};
  if(!s.category_id||!s.merchant_location_key||!s.fulfillment_policy_id||!s.payment_policy_id||!s.return_policy_id)issues.push("Complete and save the eBay category, location key, and all three business policy IDs.");
- box.innerHTML='<div class="kicker">Listing preview · Not published yet</div><h4>'+esc(item.title)+'</h4><div class="preview-meta">SKU: '+esc(item.id)+' · Condition: '+esc(item.condition)+' · Quantity: '+Number(item.quantity||0)+'</div><div class="preview-price">'+fmt(item.price)+'</div><div class="preview-meta">Author/maker: '+esc(item.author||"Not entered")+' · ISBN/barcode: '+esc(item.isbn||"Not entered")+'</div><p>'+esc(item.description||"No customer-facing description entered yet.")+'</p>'+(issues.length?'<div class="preview-warning"><strong>Review before publishing</strong><br>'+issues.map(esc).join("<br>")+'</div>':'<div class="message">The item passes OneCopy checks. Click Publish only when you are ready to create or revise the live eBay listing.</div>');
+ box.innerHTML='<div class="kicker">Listing preview · Not published yet</div><h4>'+esc(listingTitle)+'</h4>'+(listingTitle!==item.title?'<div class="preview-meta">OneCopy master title preserved: '+esc(item.title)+'</div>':'')+'<div class="preview-meta">SKU: '+esc(item.id)+' · Condition: '+esc(item.condition)+' · Quantity: '+Number(item.quantity||0)+'</div><div class="preview-price">'+fmt(item.price)+'</div><div class="preview-meta">Author/maker: '+esc(item.author||"Not entered")+' · ISBN/barcode: '+esc(item.isbn||"Not entered")+'</div><p>'+esc(item.description||"No customer-facing description entered yet.")+'</p>'+(issues.length?'<div class="preview-warning"><strong>Review before publishing</strong><br>'+issues.map(esc).join("<br>")+'</div>':'<div class="message">The item passes OneCopy checks. Click Publish only when you are ready to create or revise the live eBay listing.</div>');
  $("#publishEbayItem").disabled=issues.length>0||!item;
 }
 function renderEbayListings(rows){
@@ -380,16 +382,26 @@ $("#createEbayLocation").addEventListener("click",async function(){
 });
 $("#previewEbayItem").addEventListener("click",function(){
  var id=$("#ebayProductSelect").value,item=inventoryRows.find(function(p){return p.id===id});
- if(!item){showEbayPreview(null);notice("Choose an approved, in-stock item to preview.",true);return;}
+ if(!item){showEbayPreview(null);notice("Choose an approved, in-stock book to preview.",true);return;}
+ if(!$("#ebayListingTitle").value.trim()){
+  var match=(ebayStatusData&&ebayStatusData.listings||[]).find(function(l){return l.product_id===id});
+  $("#ebayListingTitle").value=(match&&match.listing_title)||(String(item.title||"").length<=80?item.title:"");
+ }
  showEbayPreview(item);
 });
-$("#ebayProductSelect").addEventListener("change",function(){ebayPreviewItem=null;showEbayPreview(null)});
+$("#ebayProductSelect").addEventListener("change",function(){
+ var id=this.value,item=inventoryRows.find(function(p){return p.id===id});
+ var match=(ebayStatusData&&ebayStatusData.listings||[]).find(function(l){return l.product_id===id});
+ $("#ebayListingTitle").value=item?((match&&match.listing_title)||(String(item.title||"").length<=80?item.title:"")):"";
+ ebayPreviewItem=null;showEbayPreview(null);
+});
+$("#ebayListingTitle").addEventListener("input",function(){if(ebayPreviewItem)showEbayPreview(ebayPreviewItem)});
 $("#publishEbayItem").addEventListener("click",async function(){
  var item=ebayPreviewItem;if(!item)return;
  var oldListing=(ebayStatusData&&ebayStatusData.listings||[]).find(function(x){return x.product_id===item.id&&x.listing_status==="published"});var actionText=oldListing?"Update the existing live eBay listing":"Publish this item as a new eBay listing";if(!window.confirm(actionText+" at "+fmt(item.price)+"? This will affect a real public listing."))return;
  var btn=$("#publishEbayItem");btn.disabled=true;btn.textContent="Publishing to eBay…";
  try{
-  var result=await api("/api/admin/ebay/products/"+encodeURIComponent(item.id)+"/publish",{method:"POST",body:"{}"});
+  var result=await api("/api/admin/ebay/products/"+encodeURIComponent(item.id)+"/publish",{method:"POST",body:JSON.stringify({listing_title:$("#ebayListingTitle").value.trim()})});
   await loadEbayPanel();
   notice(result.message+" OneCopy ID "+item.id+" · eBay listing "+result.listing_id+".");
   $("#ebayProductSelect").value=item.id;showEbayPreview(item);
