@@ -82,7 +82,9 @@ async function ensureSchema(env){
  await env.DB.prepare("INSERT OR IGNORE INTO ebay_settings (id,marketplace_id,currency,merchant_location_key,location_name,city,state_or_province,country,listing_duration) VALUES (1,'EBAY_US','USD','magic-door-books','Magic Door Books','Pomona','CA','US','GTC')").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_connection (id INTEGER PRIMARY KEY CHECK(id=1), refresh_token_cipher TEXT NOT NULL, scopes TEXT NOT NULL DEFAULT '', connected_at TEXT NOT NULL, updated_at TEXT NOT NULL)").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_oauth_states (state TEXT PRIMARY KEY, session_hash TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)").run();
- await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_listings (product_id TEXT PRIMARY KEY, sku TEXT NOT NULL UNIQUE, offer_id TEXT NOT NULL DEFAULT '', listing_id TEXT NOT NULL DEFAULT '', listing_status TEXT NOT NULL DEFAULT 'not_listed', marketplace_id TEXT NOT NULL DEFAULT 'EBAY_US', last_error TEXT NOT NULL DEFAULT '', last_synced_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_listings (product_id TEXT PRIMARY KEY, sku TEXT NOT NULL UNIQUE, listing_title TEXT NOT NULL DEFAULT '', offer_id TEXT NOT NULL DEFAULT '', listing_id TEXT NOT NULL DEFAULT '', listing_status TEXT NOT NULL DEFAULT 'not_listed', marketplace_id TEXT NOT NULL DEFAULT 'EBAY_US', last_error TEXT NOT NULL DEFAULT '', last_synced_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')").run();
+ const ebayCols=await env.DB.prepare("PRAGMA table_info(ebay_listings)").all();
+ if(!(ebayCols.results||[]).some(c=>c.name==="listing_title"))await env.DB.prepare("ALTER TABLE ebay_listings ADD COLUMN listing_title TEXT NOT NULL DEFAULT ''").run();
 }
 
 const EBAY_SCOPES = [
@@ -232,20 +234,23 @@ async function ebayApiSetupStatus(env,url){
  const settings=await loadEbaySettings(env);
  const connection=await env.DB.prepare("SELECT connected_at,updated_at,scopes FROM ebay_connection WHERE id=1").first();
  const summary=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN listing_status='published' THEN 1 ELSE 0 END) AS published,SUM(CASE WHEN last_error!='' THEN 1 ELSE 0 END) AS errors FROM ebay_listings").first();
- const rows=await env.DB.prepare("SELECT l.product_id,l.sku,l.offer_id,l.listing_id,l.listing_status,l.marketplace_id,l.last_error,l.last_synced_at,l.updated_at,p.title,p.price,p.status AS product_status,p.review_status,p.zone FROM ebay_listings l LEFT JOIN products p ON p.id=l.product_id ORDER BY l.updated_at DESC LIMIT 500").all();
+ const rows=await env.DB.prepare("SELECT l.product_id,l.sku,l.listing_title,l.offer_id,l.listing_id,l.listing_status,l.marketplace_id,l.last_error,l.last_synced_at,l.updated_at,p.title,p.price,p.status AS product_status,p.review_status,p.zone FROM ebay_listings l LEFT JOIN products p ON p.id=l.product_id ORDER BY l.updated_at DESC LIMIT 500").all();
  return {configured:ebayAppConfigured(env),missingSecrets:ebayMissingAppConfig(env),connected:Boolean(connection&&connection.connected_at),connectedAt:connection&&connection.connected_at||"",scopes:connection&&connection.scopes||"",environment:ebayMode(env),callbackUrl:url.origin+"/api/ebay/callback",settings,summary:summary||{total:0,published:0,errors:0},listings:rows.results||[]};
 }
-async function publishEbayItem(env,productId){
+async function publishEbayItem(env,productId,titleOverride){
  const row=await env.DB.prepare("SELECT * FROM products WHERE id=?").bind(productId).first();
  if(!row)throw new Error("Inventory item not found.");
  const item=toAdmin(row);
+ const prior=await env.DB.prepare("SELECT * FROM ebay_listings WHERE product_id=?").bind(productId).first();
+ const listingTitle=String(titleOverride||prior&&prior.listing_title||item.title||"").trim();
  if(String(item.category||"").toLowerCase()!=="book")throw new Error("The first eBay connector is configured for books. Non-book items need their own category mapping before listing.");
  if(item.review_status!=="approved")throw new Error("Approve this item in OneCopy before listing it on eBay.");
  if(item.zone==="rear_restricted")throw new Error("Restricted Rear-zone items cannot be listed on eBay.");
  if(item.status!=="in_stock"||Number(item.quantity)<1)throw new Error("This item is not currently in stock.");
  if(Number(item.price)<=0)throw new Error("Set a positive asking price before listing.");
  if(!String(item.title||"").trim())throw new Error("A listing title is required.");
- if(String(item.title).length>80)throw new Error("eBay titles are limited to 80 characters here. Shorten the inventory title before publishing.");
+ if(!listingTitle)throw new Error("Enter an eBay listing title.");
+ if(listingTitle.length>80)throw new Error("eBay listing titles are limited to 80 characters. Shorten the eBay-specific title; the full OneCopy title will be preserved.");
  if(item.image_url&&!/^https:\/\//i.test(item.image_url))throw new Error("Image URL must use HTTPS.");
  const settings=await loadEbaySettings(env);
  const required=[
@@ -259,10 +264,10 @@ async function publishEbayItem(env,productId){
  if(missing.length)throw new Error("Complete eBay setup first: "+missing.join(", ")+".");
  if(!env.EBAY_CLIENT_ID||!env.EBAY_CLIENT_SECRET||!env.EBAY_TOKEN_ENCRYPTION_KEY)throw new Error("One or more eBay Cloudflare secrets are missing.");
  const access=await ebayAccessToken(env);
- const prior=await env.DB.prepare("SELECT * FROM ebay_listings WHERE product_id=?").bind(productId).first();
  const sku=prior&&prior.sku?prior.sku:String(item.id);
  const isbn=String(item.isbn||"").replace(/[^0-9Xx]/g,"").toUpperCase();
- const product={title:String(item.title).trim(),description:String(item.description||("Condition: "+item.condition)).slice(0,5000),imageUrls:item.image_url?[item.image_url]:[]};
+ const product={title:listingTitle,description:String(item.description||("Condition: "+item.condition)).slice(0,5000),imageUrls:item.image_url?[item.image_url]:[],aspects:{"Book Title":[String(item.title).slice(0,200)]}};
+ if(item.author)product.aspects.Author=[String(item.author).slice(0,200)];
  if(/^(?:\d{9}[\dX]|\d{13})$/.test(isbn))product.isbn=[isbn];
  const conditions={"As New":"LIKE_NEW","Very Good":"USED_VERY_GOOD","Good":"USED_GOOD","Acceptable":"USED_ACCEPTABLE","Fair":"USED_ACCEPTABLE"};
  const ebayCondition=conditions[item.condition]||"USED_GOOD";
@@ -288,17 +293,17 @@ async function publishEbayItem(env,productId){
    offerId=String(created.data.offerId||"");
    if(!offerId)throw new Error("eBay created an offer but did not return its offer ID.");
   }
-  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,? ,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,offerId,listingId,listingId?"published":"draft",settings.marketplace_id,now(),now()).run();
+  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,listing_title,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,listing_title=excluded.listing_title,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,listingTitle,offerId,listingId,listingId?"published":"draft",settings.marketplace_id,now(),now()).run();
   if(!listingId){
    const published=await ebayRequest(env,"/sell/inventory/v1/offer/"+encodeURIComponent(offerId)+"/publish",{method:"POST",body:"{}"},access);
    listingId=String(published.data.listingId||"");
    if(!listingId)throw new Error("eBay accepted the publish request but returned no listing ID. Check eBay Seller Hub before retrying.");
   }
-  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,offerId,listingId,"published",settings.marketplace_id,now(),now()).run();
-  return {ok:true,product_id:productId,sku,offer_id:offerId,listing_id:listingId,status:"published",message:prior&&prior.listing_id?"Existing eBay listing updated.":"Listing published to eBay."};
+  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,listing_title,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,listing_title=excluded.listing_title,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,listingTitle,offerId,listingId,"published",settings.marketplace_id,now(),now()).run();
+  return {ok:true,product_id:productId,sku,listing_title:listingTitle,offer_id:offerId,listing_id:listingId,status:"published",message:prior&&prior.listing_id?"Existing eBay listing updated.":"Listing published to eBay."};
  }catch(e){
   const message=String(e&&e.message||"eBay request failed").slice(0,1000);
-  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?, ?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,last_error=excluded.last_error,last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,offerId,listingId,listingId?"published":"error",settings.marketplace_id,message,now(),now()).run();
+  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,listing_title,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,listing_title=excluded.listing_title,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,last_error=excluded.last_error,last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,listingTitle,offerId,listingId,listingId?"published":"error",settings.marketplace_id,message,now(),now()).run();
   throw e;
  }
 }
@@ -378,7 +383,8 @@ async function api(req,env,url){
   }
   const publishMatch=p.match(/^\/api\/admin\/ebay\/products\/([^/]+)\/publish$/);
   if(publishMatch&&method==="POST"){
-   try{return json(await publishEbayItem(env,decodeURIComponent(publishMatch[1])));}
+   const b=await read(req)||{};
+   try{return json(await publishEbayItem(env,decodeURIComponent(publishMatch[1]),b.listing_title));}
    catch(e){return json({error:String(e&&e.message||"eBay listing failed"),status:e&&e.status||0},e&&e.status>=500?502:400);}
   }
   const withdrawMatch=p.match(/^\/api\/admin\/ebay\/products\/([^/]+)\/withdraw$/);
