@@ -523,7 +523,8 @@ async function analyzeItemCapture(body,env){
  for(const key of ["estimatedLow","estimatedHigh","suggestedPrice"]){const n=Number(result[key]);result[key]=result[key]===null||result[key]===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100;}
  if(!["sold_comps","active_listings","catalog","visual_estimate","none"].includes(result.valuationBasis))result.valuationBasis="none";
  if(!["low","medium","high"].includes(result.confidence))result.confidence="low";
- return json({ok:true,result,model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100),webResearchUsed:(providerData.output||[]).some(x=>x.type==="web_search_call"),disclaimer:"AI identification and estimates can be wrong. Confirm identifiers, provenance, condition and value before pricing or listing."});
+ const researchSources=(providerData.output||[]).filter(x=>x.type==="web_search_call").flatMap(x=>x.action&&Array.isArray(x.action.sources)?x.action.sources:[]).map(x=>{let url="";try{const u=new URL(String(x.url||""));if(u.protocol==="https:"||u.protocol==="http:")url=u.toString();}catch{}return {title:captureText(x.title||url,250),url};}).filter(x=>x.url).slice(0,12);
+ return json({ok:true,result,model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100),webResearchUsed:(providerData.output||[]).some(x=>x.type==="web_search_call"),researchSources,disclaimer:"AI identification and estimates can be wrong. Confirm identifiers, provenance, condition and value before pricing or listing."});
 }
 
 async function api(req,env,url){
