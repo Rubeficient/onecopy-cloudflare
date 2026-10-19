@@ -34,3 +34,21 @@ You can use the D1 SQL Console in the Cloudflare dashboard to apply the migratio
 ## Important limitations
 
 This is an early starter, not a production-audited commerce system. Before real customer use, add and test Square payment processing, customer order creation, inventory reservation and reconciliation, shipping/tax/returns, robust authentication and backup/restore. Do not commit passwords, tokens or session secrets to GitHub.
+
+
+## eBay Marketplace Manager (first integration)
+
+The admin page includes an eBay-first listing workflow. It supports seller OAuth, encrypted refresh-token storage in D1, business-policy lookup, inventory-location setup, listing preview, and create/update/publish of approved books via the eBay Sell Inventory API. Start with books only; non-book departments need marketplace-specific category mapping before publishing.
+
+### Required eBay setup
+
+1. Create an eBay Developer Program application and obtain the production or sandbox Client ID and Client Secret.
+2. Create a RuName in the eBay developer application. Configure its Redirect URL to the exact URL displayed in OneCopy's eBay Marketplace screen (currently `https://onecopy-cloudflare.newrube.workers.dev/api/ebay/callback` for the existing Worker hostname). Set the Worker secret `EBAY_RUNAME` to the RuName identifier, not the raw URL.
+3. In Cloudflare Workers & Pages → `onecopy-commerce` → Settings → Variables and Secrets, add these as secrets: `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_RUNAME`, and `EBAY_TOKEN_ENCRYPTION_KEY`. Use a long, random encryption secret. Keep all credentials out of GitHub. Set `EBAY_ENVIRONMENT` to `production` for live selling or `sandbox` when using eBay Sandbox keys and test accounts.
+4. Deploy, sign in to `/admin`, open eBay Marketplace, and select Connect eBay seller account. Approve the requested permissions on eBay.
+5. Enter the correct leaf category ID and your actual ship-from address; save the settings and register the inventory location. Then load your eBay business policies, select the matching fulfillment/shipping, payment, and return policy IDs, and save again.
+6. In OneCopy inventory, approve an in-stock book, give it a positive price, and enter a public HTTPS photo URL. In eBay Marketplace, preview the item and explicitly confirm before publishing. Check the returned listing link in eBay Seller Hub.
+
+### Important boundary of the first eBay release
+
+This first release can publish and revise the eBay-managed offer when you manually preview and confirm. It does **not yet import eBay orders, automatically detect an eBay sale, or synchronize sold inventory across eBay and OneCopy**. Keep checking orders in eBay Seller Hub and update OneCopy stock until order synchronization is implemented. A successful JavaScript syntax check is not the same as an end-to-end eBay account test; real publishing depends on your credentials, seller eligibility, category requirements, inventory location, photos, and valid business policies.
