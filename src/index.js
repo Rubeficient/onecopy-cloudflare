@@ -77,6 +77,12 @@ async function ensureSchema(env){
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_products_zone ON products (zone, review_status)").run();
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_products_isbn ON products (isbn)").run();
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders (created_at DESC)").run();
+
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_settings (id INTEGER PRIMARY KEY CHECK(id=1), marketplace_id TEXT NOT NULL DEFAULT 'EBAY_US', currency TEXT NOT NULL DEFAULT 'USD', category_id TEXT NOT NULL DEFAULT '', merchant_location_key TEXT NOT NULL DEFAULT 'magic-door-books', location_name TEXT NOT NULL DEFAULT 'Magic Door Books', address_line1 TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT 'Pomona', state_or_province TEXT NOT NULL DEFAULT 'CA', postal_code TEXT NOT NULL DEFAULT '', country TEXT NOT NULL DEFAULT 'US', fulfillment_policy_id TEXT NOT NULL DEFAULT '', payment_policy_id TEXT NOT NULL DEFAULT '', return_policy_id TEXT NOT NULL DEFAULT '', listing_duration TEXT NOT NULL DEFAULT 'GTC', updated_at TEXT NOT NULL DEFAULT '')").run();
+ await env.DB.prepare("INSERT OR IGNORE INTO ebay_settings (id,marketplace_id,currency,merchant_location_key,location_name,city,state_or_province,country,listing_duration) VALUES (1,'EBAY_US','USD','magic-door-books','Magic Door Books','Pomona','CA','US','GTC')").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_connection (id INTEGER PRIMARY KEY CHECK(id=1), refresh_token_cipher TEXT NOT NULL, scopes TEXT NOT NULL DEFAULT '', connected_at TEXT NOT NULL, updated_at TEXT NOT NULL)").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_oauth_states (state TEXT PRIMARY KEY, session_hash TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_listings (product_id TEXT PRIMARY KEY, sku TEXT NOT NULL UNIQUE, offer_id TEXT NOT NULL DEFAULT '', listing_id TEXT NOT NULL DEFAULT '', listing_status TEXT NOT NULL DEFAULT 'not_listed', marketplace_id TEXT NOT NULL DEFAULT 'EBAY_US', last_error TEXT NOT NULL DEFAULT '', last_synced_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')").run();
 }
 function normal(body){
  const title=s(body.title,300);if(!title)return {error:"Item name is required."};
