@@ -326,6 +326,72 @@ async function api(req,env,url){
  if(p.startsWith("/api/admin/")){
   if(!await auth(req,env.SESSION_SECRET))return json({error:"Please sign in to the admin panel."},401);
   await ensureSchema(env);
+
+  if(p==="/api/admin/ebay/status"&&method==="GET")return json(await ebayApiSetupStatus(env,url));
+  if(p==="/api/admin/ebay/settings"&&method==="GET")return json({settings:await loadEbaySettings(env)});
+  if(p==="/api/admin/ebay/settings"&&method==="PUT"){
+   const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);
+   try{return json({ok:true,settings:await saveEbaySettings(env,b)});}catch(e){return json({error:e.message},400);}
+  }
+  if(p==="/api/admin/ebay/connect"&&method==="POST"){
+   const result=await startEbayOAuth(req,env,url);
+   if(result.error)return json({error:result.error},400);
+   return json({ok:true,authUrl:result.authUrl});
+  }
+  if(p==="/api/admin/ebay/disconnect"&&method==="POST"){
+   await env.DB.prepare("DELETE FROM ebay_connection WHERE id=1").run();
+   await env.DB.prepare("DELETE FROM ebay_oauth_states").run();
+   return json({ok:true,message:"OneCopy removed the saved eBay connection. Existing eBay listings have not been ended."});
+  }
+  if(p==="/api/admin/ebay/policies"&&method==="GET"){
+   const access=await ebayAccessToken(env),settings=await loadEbaySettings(env),market=encodeURIComponent(settings&&settings.marketplace_id||"EBAY_US");
+   const results=await Promise.all([
+    ebayRequest(env,"/sell/account/v1/fulfillment_policy?marketplace_id="+market,{method:"GET"},access),
+    ebayRequest(env,"/sell/account/v1/payment_policy?marketplace_id="+market,{method:"GET"},access),
+    ebayRequest(env,"/sell/account/v1/return_policy?marketplace_id="+market,{method:"GET"},access)
+   ]);
+   return json({fulfillment:results[0].data.fulfillmentPolicies||[],payment:results[1].data.paymentPolicies||[],returns:results[2].data.returnPolicies||[]});
+  }
+  if(p==="/api/admin/ebay/locations"&&method==="GET"){
+   const access=await ebayAccessToken(env);
+   const result=await ebayRequest(env,"/sell/inventory/v1/location?limit=100&offset=0",{method:"GET"},access);
+   return json({locations:result.data.locations||[],total:result.data.total||0});
+  }
+  if(p==="/api/admin/ebay/location"&&method==="POST"){
+   const settings=await loadEbaySettings(env);
+   if(!settings||!settings.merchant_location_key) return json({error:"Enter and save a merchant location key first."},400);
+   if(!settings.country||(!(settings.postal_code)&&!(settings.city&&settings.state_or_province)))return json({error:"Enter a postal code and country, or city, state and country for the ship-from location."},400);
+   const access=await ebayAccessToken(env),key=encodeURIComponent(settings.merchant_location_key);
+   try{
+    await ebayRequest(env,"/sell/inventory/v1/location/"+key,{method:"GET"},access);
+    return json({ok:true,exists:true,message:"This eBay inventory location already exists."});
+   }catch(e){if(e.status!==404)throw e;}
+   const loc={name:settings.location_name||"Magic Door Books",locationTypes:["WAREHOUSE"],location:{address:{city:settings.city,stateOrProvince:settings.state_or_province,country:settings.country}}};
+   if(settings.address_line1)loc.location.address.addressLine1=settings.address_line1;
+   if(settings.postal_code)loc.location.address.postalCode=settings.postal_code;
+   await ebayRequest(env,"/sell/inventory/v1/location/"+key,{method:"POST",body:JSON.stringify(loc)},access);
+   return json({ok:true,exists:false,message:"eBay inventory location created and ready to use."},201);
+  }
+  if(p==="/api/admin/ebay/listings"&&method==="GET"){
+   const status=await ebayApiSetupStatus(env,url);return json({listings:status.listings,summary:status.summary});
+  }
+  const publishMatch=p.match(/^\/api\/admin\/ebay\/products\/([^/]+)\/publish$/);
+  if(publishMatch&&method==="POST"){
+   try{return json(await publishEbayItem(env,decodeURIComponent(publishMatch[1])));}
+   catch(e){return json({error:String(e&&e.message||"eBay listing failed"),status:e&&e.status||0},e&&e.status>=500?502:400);}
+  }
+  const withdrawMatch=p.match(/^\/api\/admin\/ebay\/products\/([^/]+)\/withdraw$/);
+  if(withdrawMatch&&method==="POST"){
+   const id=decodeURIComponent(withdrawMatch[1]);
+   const existing=await env.DB.prepare("SELECT * FROM ebay_listings WHERE product_id=?").bind(id).first();
+   if(!existing||!existing.offer_id)return json({error:"No OneCopy-managed eBay offer exists for this item."},404);
+   const access=await ebayAccessToken(env);
+   await ebayRequest(env,"/sell/inventory/v1/offer/"+encodeURIComponent(existing.offer_id)+"/withdraw",{method:"POST",body:"{}"},access);
+   const now=new Date().toISOString();
+   await env.DB.prepare("UPDATE ebay_listings SET listing_status='withdrawn',last_error='',last_synced_at=?,updated_at=? WHERE product_id=?").bind(now,now,id).run();
+   return json({ok:true,message:"eBay listing withdrawn. The OneCopy inventory record remains intact."});
+  }
+
   if(p==="/api/admin/products"&&method==="GET"){const r=await env.DB.prepare("SELECT * FROM products ORDER BY created_at DESC LIMIT 1000").all();return json({products:(r.results||[]).map(toAdmin)});}
   if(p==="/api/admin/products"&&method==="POST"){
    const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);const x=normal(b);if(x.error)return json({error:x.error},400);
@@ -361,6 +427,7 @@ async function api(req,env,url){
 export default {async fetch(req,env){
  const url=new URL(req.url);
  try{
+  if(url.pathname==="/api/ebay/callback"&&req.method.toUpperCase()==="GET")return await handleEbayCallback(req,env,url);
   if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.7.1",inventory:"empty by default"});}
   if(url.pathname==="/admin"||url.pathname==="/admin/")return env.ASSETS.fetch(new Request(new URL("/admin.html",url),{method:"GET"}));
   if(url.pathname.startsWith("/api/"))return await api(req,env,url);
