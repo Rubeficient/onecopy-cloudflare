@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "onecopy-clean-db",
-      "database_id": "REPLACE_WITH_NEW_D1_DATABASE_ID",
+      "database_id": "35fca5f0-cb70-4c4f-83c1-8c77f642cb55",
       "migrations_dir": "migrations"
     }
   ],
