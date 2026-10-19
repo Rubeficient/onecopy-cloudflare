@@ -258,10 +258,10 @@ function renderEbayConnection(){
 }
 function renderEbayInventoryOptions(){
  var select=$("#ebayProductSelect"),current=select.value;
- var eligible=inventoryRows.filter(function(p){return p.review_status==="approved"&&p.zone!=="rear_restricted"&&p.status==="in_stock"&&Number(p.quantity)>0&&Number(p.price)>0;});
+ var eligible=inventoryRows.filter(function(p){return String(p.category||"").toLowerCase()==="book"&&p.review_status==="approved"&&p.zone!=="rear_restricted"&&p.status==="in_stock"&&Number(p.quantity)>0&&Number(p.price)>0;});
  select.innerHTML='<option value="">Choose an approved item…</option>'+eligible.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.title)+' · '+fmt(p.price)+' · '+esc(p.id)+'</option>'}).join("");
  if(eligible.some(function(p){return p.id===current}))select.value=current;
- if(!eligible.length)select.innerHTML='<option value="">No eligible items yet — approve an in-stock item with a price first</option>';
+ if(!eligible.length)select.innerHTML='<option value="">No eligible books yet — approve an in-stock book with a price first</option>';
 }
 function showEbayPreview(item){
  ebayPreviewItem=item||null;
@@ -361,7 +361,7 @@ $("#previewEbayItem").addEventListener("click",function(){
 $("#ebayProductSelect").addEventListener("change",function(){ebayPreviewItem=null;showEbayPreview(null)});
 $("#publishEbayItem").addEventListener("click",async function(){
  var item=ebayPreviewItem;if(!item)return;
- if(!window.confirm("Publish this item to eBay at "+fmt(item.price)+"? This may create a real public listing."))return;
+ var oldListing=(ebayStatusData&&ebayStatusData.listings||[]).find(function(x){return x.product_id===item.id&&x.listing_status==="published"});var actionText=oldListing?"Update the existing live eBay listing":"Publish this item as a new eBay listing";if(!window.confirm(actionText+" at "+fmt(item.price)+"? This will affect a real public listing."))return;
  var btn=$("#publishEbayItem");btn.disabled=true;btn.textContent="Publishing to eBay…";
  try{
   var result=await api("/api/admin/ebay/products/"+encodeURIComponent(item.id)+"/publish",{method:"POST",body:"{}"});
