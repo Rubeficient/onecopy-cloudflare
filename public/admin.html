@@ -412,6 +412,16 @@ $("#copyEbayCallback").addEventListener("click",async function(){
  try{await navigator.clipboard.writeText($("#ebayCallbackUrl").textContent);notice("eBay callback URL copied.");}
  catch(e){notice("Select and copy the callback URL shown above.",true)}
 });
+$("#ebayMarketplace").addEventListener("change",function(){
+ var currencyByMarket={EBAY_US:"USD",EBAY_CA:"CAD",EBAY_GB:"GBP",EBAY_AU:"AUD"};
+ $("#ebayCurrency").value=currencyByMarket[this.value]||"USD";
+ ebayCategoryAspects=[];$("#ebayCategoryAspects").classList.add("hidden");
+ if(ebayPreviewItem)showEbayPreview(ebayPreviewItem);
+});
+$("#ebayCategory").addEventListener("change",function(){
+ ebayCategoryAspects=[];$("#ebayCategoryAspects").classList.add("hidden");
+ if(ebayPreviewItem)showEbayPreview(ebayPreviewItem);
+});
 $("#loadEbayCategoryAspects").addEventListener("click",fetchEbayCategoryAspects);
 $("#loadEbayPolicies").addEventListener("click",async function(){
  try{
