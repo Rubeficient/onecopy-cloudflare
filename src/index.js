@@ -430,6 +430,100 @@ function normal(body){
  return {title,author:s(body.author,300),isbn:s(body.isbn,40),category:s(body.category||"Book",100),description:s(body.description,5000),condition:s(body.condition||"Good",100),price:m(body.price),msrp:m(body.msrp),stock_mode:body.stock_mode==="quantity"?"quantity":"unique",quantity,status,zone,location:s(body.location,200),review_status:review,online_published:published?1:0,image_url:s(body.image_url,2000),item_json:JSON.stringify(extra)};
 }
 function toAdmin(row){let x={};try{x=JSON.parse(row.item_json||"{}");}catch{}return {...row,...x,item_json:undefined,online_published:Boolean(row.online_published)};}
+
+const ITEM_CAPTURE_SCHEMA = {
+ type:"object", additionalProperties:false,
+ required:["itemType","title","creator","brand","manufacturer","publisher","publicationYear","edition","identifier","materials","model","conditionAssessment","conditionNotes","description","features","confidence","needsReview","reviewReasons","estimatedLow","estimatedHigh","suggestedPrice","valuationBasis","valuationNotes","marketEvidence","searchQueries"],
+ properties:{
+  itemType:{type:"string",enum:["Book","Clothing","Jewelry","Antique / Collectible","Home decor","Game","Gift","Stationery","Other"]},
+  title:{type:"string"},creator:{type:"string"},brand:{type:"string"},manufacturer:{type:"string"},
+  publisher:{type:"string"},publicationYear:{type:"string"},edition:{type:"string"},identifier:{type:"string"},
+  materials:{type:"string"},model:{type:"string"},
+  conditionAssessment:{type:"string",enum:["As New","Very Good","Good","Acceptable","Fair","Not Applicable","Unknown"]},
+  conditionNotes:{type:"string"},description:{type:"string"},
+  features:{type:"array",items:{type:"string"}},
+  confidence:{type:"string",enum:["low","medium","high"]},needsReview:{type:"boolean"},reviewReasons:{type:"array",items:{type:"string"}},
+  estimatedLow:{type:["number","null"]},estimatedHigh:{type:["number","null"]},suggestedPrice:{type:["number","null"]},
+  valuationBasis:{type:"string",enum:["sold_comps","active_listings","catalog","visual_estimate","none"]},
+  valuationNotes:{type:"string"},
+  marketEvidence:{type:"array",items:{type:"object",additionalProperties:false,required:["title","seller","price","currency","condition","status","url","date","comparability"],properties:{
+   title:{type:"string"},seller:{type:"string"},price:{type:["number","null"]},currency:{type:"string"},
+   condition:{type:"string"},status:{type:"string",enum:["active_listing","sold_record","catalog_reference","unknown"]},
+   url:{type:"string"},date:{type:"string"},comparability:{type:"string"}
+  }}},
+  searchQueries:{type:"array",items:{type:"string"}}
+ }
+};
+function captureImageDataUrl(value){
+ const match=String(value||"").match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\r\n]+)$/);
+ if(!match)return null;
+ const data=match[2].replace(/\s/g,"");
+ if(!data.length||data.length>2500000||data.length%4!==0)return null;
+ return {mime:match[1],dataUrl:"data:"+match[1]+";base64,"+data,size:data.length};
+}
+function captureText(v,limit=500){return s(v,limit);}
+async function analyzeItemCapture(body,env){
+ if(!env.OPENAI_API_KEY)return json({error:"AI Item Capture is not configured. In Cloudflare, open your OneCopy Worker → Settings → Variables and Secrets, then add OPENAI_API_KEY as a secret. The ChatGPT subscription and API billing are separate."},503);
+ const incoming=Array.isArray(body.images)?body.images.slice(0,5):[];
+ const images=incoming.map(x=>captureImageDataUrl(x&&x.dataUrl)).filter(Boolean);
+ if(!images.length)return json({error:"Add at least one clear photo before analyzing the item. The camera captures individual still images."},400);
+ if(incoming.length>5)return json({error:"Please use no more than five photos per item."},400);
+ if(images.length!==incoming.length)return json({error:"One or more images were invalid. Use JPEG, PNG or WebP photos and try again."},400);
+ if(images.reduce((total,x)=>total+x.size,0)>7000000)return json({error:"The photos are too large. Capture fewer images or reduce image size, then retry."},413);
+ const itemType=s(body.itemType||"Auto",80);
+ const notes=s(body.notes||"",1800);
+ const prompt=[
+  "You are OneCopy's careful cataloging assistant for a small independent bookseller and second-hand/antiques retailer.",
+  "Identify only details supported by the provided photos and user notes. Transcribe book copyright/imprint pages, ISBNs, publisher, publication year, edition/printing statements, author, signatures, labels, hallmarks, model numbers, maker's marks and garment/jewelry branding where readable.",
+  "For every uncertain fact, say unknown or explain the uncertainty. Do not claim a book is a first edition, a signature is authentic, jewelry is precious metal/genuine stone, an item is antique, or an item is by a particular maker unless evidence supports that claim. Visual identification is not authentication.",
+  "Use web search to seek live comparable marketplace listings, catalog/manufacturer references and (when findable) actual sold/completed sales. Return only sources you actually found, with exact working URLs and correct status. Never label an active asking price as a completed sale. Do not invent sellers, listing titles, prices, sold dates, URLs, or manufacturer facts.",
+  "Estimate value only when there is credible evidence. Treat active prices as asking prices, not realized value. Prefer several close sold comparables in similar condition and edition. Separate price of the same item from related items, variants and reproductions. If evidence is weak, prices conflict, authenticity matters, or the item may be rare/antique/signed/valuable, leave price fields null and recommend specialist/manual review rather than guessing. Use USD when the source supports it; report the currency accurately.",
+  "Return concise, useful catalog data. Suggested price should be a cautious asking-price suggestion, not a guaranteed appraisal. Put key limitations, match quality, and whether sources are active vs sold in valuationNotes. For an old book, identify the exact edition as best possible; do not use modern reprints as evidence of an old original.",
+  "Item type selected in the interface: "+itemType+". If Auto or the selection is inconsistent with the evidence, choose the appropriate type from the schema.",
+  "Additional staff observations: "+(notes||"None supplied."),
+  "Return only the required structured data. If no credible market evidence was found, marketEvidence must be empty and valuationBasis must be none unless a catalog reference or cautious visual estimate is clearly justified."
+ ].join("\n");
+ const content=[{type:"input_text",text:prompt}];
+ for(const image of images)content.push({type:"input_image",image_url:image.dataUrl,detail:"high"});
+ let response;
+ try{
+  response=await fetch("https://api.openai.com/v1/responses",{
+   method:"POST",headers:{"authorization":"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},
+   body:JSON.stringify({
+    model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100),
+    tools:[{type:"web_search"}],
+    input:[{role:"user",content}],
+    text:{format:{type:"json_schema",name:"onecopy_item_capture",strict:true,schema:ITEM_CAPTURE_SCHEMA}},
+    max_output_tokens:3500
+   })
+  });
+ }catch(e){return json({error:"Could not reach the AI service. Check the Worker network/logs and try again."},502);}
+ const providerData=await response.json().catch(()=>({}));
+ if(!response.ok){
+  console.error("Item capture provider error",response.status,JSON.stringify(providerData.error||{}).slice(0,500));
+  if(response.status===401||response.status===403)return json({error:"The AI provider rejected the API key or model access. Check OPENAI_API_KEY and the API project's access and billing."},503);
+  if(response.status===429)return json({error:"The AI provider rate limit or usage budget was reached. Check API usage/billing and try again later."},429);
+  return json({error:"The AI provider could not analyze this item (HTTP "+response.status+"). Check Worker logs and model access."},502);
+ }
+ const textOutput=(providerData.output||[]).flatMap(item=>item.content||[]).filter(item=>item.type==="output_text"&&typeof item.text==="string").map(item=>item.text).join("\n");
+ let result;
+ try{result=JSON.parse(textOutput);}catch(e){console.error("Item capture returned non-JSON output",textOutput.slice(0,800));return json({error:"The AI response was not in the expected catalog format. Please retry with clearer photos."},502);}
+ const fields=["title","creator","brand","manufacturer","publisher","publicationYear","edition","identifier","materials","model","conditionNotes","description","valuationNotes"];
+ for(const key of fields)result[key]=captureText(result[key],key==="description"?1800:700);
+ result.features=Array.isArray(result.features)?result.features.slice(0,12).map(x=>captureText(x,220)):[];
+ result.reviewReasons=Array.isArray(result.reviewReasons)?result.reviewReasons.slice(0,10).map(x=>captureText(x,220)):[];
+ result.searchQueries=Array.isArray(result.searchQueries)?result.searchQueries.slice(0,6).map(x=>captureText(x,200)):[];
+ result.marketEvidence=(Array.isArray(result.marketEvidence)?result.marketEvidence:[]).slice(0,8).map(x=>{
+  let url="";try{const u=new URL(String(x.url||""));if(u.protocol==="https:"||u.protocol==="http:")url=u.toString();}catch{}
+  const price=Number(x.price);
+  return {title:captureText(x.title,250),seller:captureText(x.seller,180),price:x.price===null||x.price===""||!Number.isFinite(price)||price<0?null:Math.round(price*100)/100,currency:captureText(x.currency||"USD",10),condition:captureText(x.condition,100),status:["active_listing","sold_record","catalog_reference","unknown"].includes(x.status)?x.status:"unknown",url,date:captureText(x.date,80),comparability:captureText(x.comparability,350)};
+ });
+ for(const key of ["estimatedLow","estimatedHigh","suggestedPrice"]){const n=Number(result[key]);result[key]=result[key]===null||result[key]===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100;}
+ if(!["sold_comps","active_listings","catalog","visual_estimate","none"].includes(result.valuationBasis))result.valuationBasis="none";
+ if(!["low","medium","high"].includes(result.confidence))result.confidence="low";
+ return json({ok:true,result,model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100),webResearchUsed:(providerData.output||[]).some(x=>x.type==="web_search_call"),disclaimer:"AI identification and estimates can be wrong. Confirm identifiers, provenance, condition and value before pricing or listing."});
+}
+
 async function api(req,env,url){
  const p=url.pathname,method=req.method.toUpperCase();
 
@@ -452,6 +546,8 @@ async function api(req,env,url){
   await ensureSchema(env);
 
 
+  if(p==="/api/admin/item-capture/status"&&method==="GET")return json({configured:Boolean(env.OPENAI_API_KEY),model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});
+  if(p==="/api/admin/item-capture/analyze"&&method==="POST"){const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);return await analyzeItemCapture(b,env);}
   if(p==="/api/admin/themes"&&method==="GET"){
    const rows=await env.DB.prepare("SELECT id,name,theme_json,is_active,created_at,updated_at FROM storefront_skins ORDER BY is_active DESC,name ASC").all();
    const skins=(rows.results||[]).map(row=>{let theme={};try{theme=normalizeTheme(JSON.parse(row.theme_json||"{}"));}catch{theme=normalizeTheme(DEFAULT_THEME);}theme.themeId=row.id;theme.themeName=row.name;return {id:row.id,name:row.name,is_active:Boolean(row.is_active),created_at:row.created_at,updated_at:row.updated_at,theme};});
@@ -603,7 +699,7 @@ export default {async fetch(req,env){
  const url=new URL(req.url);
  try{
   if(url.pathname==="/api/ebay/callback"&&req.method.toUpperCase()==="GET")return await handleEbayCallback(req,env,url);
-  if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.9.0",inventory:"empty by default"});}
+  if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.10.0",inventory:"empty by default"});}
   if(url.pathname==="/admin"||url.pathname==="/admin/")return env.ASSETS.fetch(new Request(new URL("/admin.html",url),{method:"GET"}));
   if(url.pathname.startsWith("/api/"))return await api(req,env,url);
   return env.ASSETS.fetch(req);
