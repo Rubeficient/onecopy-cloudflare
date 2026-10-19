@@ -316,13 +316,12 @@ async function publishEbayItem(env,productId,titleOverride,submittedAspects){
  if(!env.EBAY_CLIENT_ID||!env.EBAY_CLIENT_SECRET||!env.EBAY_TOKEN_ENCRYPTION_KEY)throw new Error("One or more eBay Cloudflare secrets are missing.");
  const access=await ebayAccessToken(env);
  const categoryAspects=await getEbayCategoryAspects(env,access,settings.marketplace_id||"EBAY_US",settings.category_id);
- const listingAspects=cleanListingAspects(submittedAspects,categoryAspects,prior&&prior.listing_aspects_json?prior:item);
+ const listingAspects=cleanListingAspects(submittedAspects,categoryAspects,{...item,listing_aspects_json:prior&&prior.listing_aspects_json||"{}"});
  const missingAspects=categoryAspects.filter(a=>a.required&&!(listingAspects[a.name]||[]).length);
  if(missingAspects.length)throw new Error("Fill the required eBay item specifics: "+missingAspects.map(a=>a.name).join(", ")+". Use Load required item specifics in the preview panel.");
  const sku=prior&&prior.sku?prior.sku:String(item.id);
  const isbn=String(item.isbn||"").replace(/[^0-9Xx]/g,"").toUpperCase();
- const product={title:listingTitle,description:String(item.description||("Condition: "+item.condition)).slice(0,5000),imageUrls:item.image_url?[item.image_url]:[],aspects:{...listingAspects,"Book Title":[String(item.title).slice(0,200)]}};
- if(item.author)product.aspects.Author=[String(item.author).slice(0,200)];
+ const product={title:listingTitle,description:String(item.description||("Condition: "+item.condition)).slice(0,5000),imageUrls:item.image_url?[item.image_url]:[],aspects:{"Book Title":[String(item.title).slice(0,200)],...(item.author?{Author:[String(item.author).slice(0,200)]}:{}),...listingAspects}};
  if(/^(?:\d{9}[\dX]|\d{13})$/.test(isbn))product.isbn=[isbn];
  const conditions={"As New":"LIKE_NEW","Very Good":"USED_VERY_GOOD","Good":"USED_GOOD","Acceptable":"USED_ACCEPTABLE","Fair":"USED_ACCEPTABLE"};
  const ebayCondition=conditions[item.condition]||"USED_GOOD";
