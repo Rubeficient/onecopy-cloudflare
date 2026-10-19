@@ -28,7 +28,7 @@ async function api(req,env,url){
  if(p==="/api/admin/login"&&method==="POST"){
   if(!env.ADMIN_PASSWORD||!env.SESSION_SECRET)return json({error:"Admin setup incomplete. Set ADMIN_PASSWORD and SESSION_SECRET in Cloudflare Worker secrets."},503);
   const b=await read(req);if(!b||b.password!==env.ADMIN_PASSWORD)return json({error:"Incorrect password."},401);
-  return json({ok:true},200,{"set-cookie":cookie(await session(env.SESSION_SECRET)});
+  return json({ok:true},200,{"set-cookie":cookie(await session(env.SESSION_SECRET))});
  }
  if(p==="/api/admin/logout"&&method==="POST")return json({ok:true},200,{"set-cookie":"onecopy_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"});
  if(p.startsWith("/api/admin/")){
