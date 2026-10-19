@@ -38,7 +38,7 @@ This is an early starter, not a production-audited commerce system. Before real 
 
 ## eBay Marketplace Manager (first integration)
 
-The admin page includes an eBay-first listing workflow. It supports seller OAuth, encrypted refresh-token storage in D1, business-policy lookup, inventory-location setup, listing preview, and create/update/publish of approved books via the eBay Sell Inventory API. Start with books only; non-book departments need marketplace-specific category mapping before publishing.
+The admin page includes an eBay-first listing workflow. It supports seller OAuth, encrypted refresh-token storage in D1, business-policy lookup, inventory-location setup, dynamic required/recommended item specifics from the eBay Taxonomy API, a marketplace-specific title override, listing preview, and create/update/publish/withdraw of approved books via the eBay Sell Inventory API. Start with books only; non-book departments need marketplace-specific category mapping before publishing.
 
 ### Required eBay setup
 
@@ -47,7 +47,8 @@ The admin page includes an eBay-first listing workflow. It supports seller OAuth
 3. In Cloudflare Workers & Pages → `onecopy-commerce` → Settings → Variables and Secrets, add these as secrets: `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_RUNAME`, and `EBAY_TOKEN_ENCRYPTION_KEY`. Use a long, random encryption secret. Keep all credentials out of GitHub. Set `EBAY_ENVIRONMENT` to `production` for live selling or `sandbox` when using eBay Sandbox keys and test accounts.
 4. Deploy, sign in to `/admin`, open eBay Marketplace, and select Connect eBay seller account. Approve the requested permissions on eBay.
 5. Enter the correct leaf category ID and your actual ship-from address; save the settings and register the inventory location. Then load your eBay business policies, select the matching fulfillment/shipping, payment, and return policy IDs, and save again.
-6. In OneCopy inventory, approve an in-stock book, give it a positive price, and enter a public HTTPS photo URL. In eBay Marketplace, preview the item and explicitly confirm before publishing. Check the returned listing link in eBay Seller Hub.
+6. Click **Load required item specifics** for the selected marketplace/category. OneCopy retrieves eBay's required and recommended item details. Fill all required facts from the actual book and save the eBay settings again if you changed the category, marketplace or policy IDs. The category metadata can change, so reload specifics whenever the marketplace or category changes.
+7. In OneCopy inventory, approve an in-stock book, give it a positive price, and enter a public HTTPS photo URL. In eBay Marketplace, preview the item, complete required specifics, and explicitly confirm before publishing. For long titles, use the eBay-specific title override; the full master title remains in OneCopy. Check the returned listing link in eBay Seller Hub.
 
 ### Important boundary of the first eBay release
 
