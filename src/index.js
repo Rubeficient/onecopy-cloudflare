@@ -139,5 +139,5 @@ export default {async fetch(req,env){
   if(url.pathname==="/admin"||url.pathname==="/admin/")return env.ASSETS.fetch(new Request(new URL("/admin.html",url),{method:"GET"}));
   if(url.pathname.startsWith("/api/"))return await api(req,env,url);
   return env.ASSETS.fetch(req);
- }catch(e){console.error("OneCopy error",e&&e.stack?e.stack:e);return json({error:"The request failed. Check Worker logs for details."},500);}
+ }catch(e){console.error("OneCopy error",e&&e.stack?e.stack:e);const isAdminApi=url.pathname.startsWith("/api/admin/");const detail=String(e&&e.message?e.message:"Unknown error").slice(0,280);return json({error:isAdminApi?("Inventory request failed: "+detail):"The request failed. Check Worker logs for details."},500);}
 }};
