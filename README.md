@@ -8,6 +8,7 @@ OneCopy is a simple inventory-backed catalog for Magic Door Books, with the phys
 - Public inventory API: `/api/products`
 - Health check: `/health`
 - Admin sign-in and inventory API
+- AI Item Capture workspace (requires `OPENAI_API_KEY`; review-first; original photos not yet retained)
 - Cloudflare Workers + D1 schema
 - **Starts with an empty inventory.** No local catalog import and no demo inventory are required.
 - **Online card checkout and Square are not implemented in this repository yet.** The storefront is currently a catalog preview, not a live store taking payments.
