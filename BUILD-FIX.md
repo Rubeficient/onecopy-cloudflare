@@ -1,0 +1,1 @@
+The prior Module not found build failure was caused by missing src/index.js and public pages. These files have now been added. The project starts with an empty catalog. Checkout/payment is not yet enabled; Square credentials and a complete payment/order workflow must be added before accepting real orders.
