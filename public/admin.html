@@ -388,12 +388,13 @@ $("#captureStopCamera").addEventListener("click",stopCaptureCamera);
 $("#captureFileInput").addEventListener("change",async function(e){
  var files=Array.from(e.target.files||[]);e.target.value="";
  if(!files.length)return;
+ var slotsAtStart=captureImages.length,skipped=files.length>5-slotsAtStart;
  for(var i=0;i<files.length&&captureImages.length<5;i++){
   try{var dataUrl=await captureFileToDataUrl(files[i]);captureImages.push({dataUrl:dataUrl,label:files[i].name||("Photo "+(captureImages.length+1))})}
   catch(err){setCaptureStatus(err.message||"Could not open a selected photo.","error")}
  }
- if(files.length+captureImages.length>5)setCaptureStatus("Only five photos can be analyzed at once. Extra photos were skipped.","error");
  renderCaptureImages();
+ if(skipped)setCaptureStatus("Only five photos can be analyzed at once. Extra photos were skipped.","error");
 });
 $("#captureClearPhotos").addEventListener("click",function(){captureImages=[];renderCaptureImages();setCaptureStatus("Photos cleared.");});
 $("#captureImageGrid").addEventListener("click",function(e){
