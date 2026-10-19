@@ -429,10 +429,12 @@ $("#captureTransfer").addEventListener("click",function(){
  $("#cpv").value=sold.length?String(Math.round(sold[Math.floor(sold.length/2)]*100)/100):"0";
  $("#valuationBasis").value=sold.length?"sold_comps":(r.valuationBasis==="catalog"?"catalog":"none");
  $("#valuationConfidence").value=r.confidence||"low";
- $("#marketComps").value=(r.marketEvidence||[]).map(function(x){return "["+x.status+"] "+(x.title||"Untitled")+" · "+(x.seller||"source unknown")+" · "+(x.price===null||x.price===undefined?"price not available":(x.currency||"USD")+" "+x.price)+(x.date?" · "+x.date:"")+"\n"+(x.condition||"Condition not stated")+"\n"+(x.url||"No source URL")+"\n"+(x.comparability||"Similarity not assessed")}).join("\n\n");
+ var evidenceNotes=(r.marketEvidence||[]).map(function(x){return "["+x.status+"] "+(x.title||"Untitled")+" · "+(x.seller||"source unknown")+" · "+(x.price===null||x.price===undefined?"price not available":(x.currency||"USD")+" "+x.price)+(x.date?" · "+x.date:"")+"\n"+(x.condition||"Condition not stated")+"\n"+(x.url||"No source URL")+"\n"+(x.comparability||"Similarity not assessed")});
+ var sourceNotes=(r.researchSources||[]).map(function(x){return "[Web research source] "+x.title+"\n"+x.url});
+ $("#marketComps").value=evidenceNotes.concat(sourceNotes).join("\n\n");
  var details=[["Brand",r.brand],["Manufacturer/maker",r.manufacturer],["Publisher",r.publisher],["Publication year",r.publicationYear],["Edition",r.edition],["Model",r.model],["Materials",r.materials],["Condition notes",r.conditionNotes],["Visible features",(r.features||[]).join("; ")]].filter(function(x){return String(x[1]||"").trim()!==""}).map(function(x){return x[0]+": "+x[1]});
  $("#description").value=[r.description||"",details.length?"AI identification details (verify):\n"+details.join("\n"):""].filter(Boolean).join("\n\n");
- $("#notes").value=["AI-assisted identification — verify every claim before pricing or listing.",r.valuationNotes||"",r.needsReview?"Human review requested: "+(r.reviewReasons||[]).join("; "):"", "AI confidence: "+(r.confidence||"low")].filter(Boolean).join("\n\n");
+ $("#notes").value=["AI-assisted identification — verify every claim before pricing or listing.","Estimated range: "+captureMoney(r.estimatedLow)+" to "+captureMoney(r.estimatedHigh)+". Suggested ask: "+captureMoney(r.suggestedPrice)+".",r.valuationNotes||"",r.needsReview?"Human review requested: "+(r.reviewReasons||[]).join("; "):"", "AI confidence: "+(r.confidence||"low")].filter(Boolean).join("\n\n");
  var vintageYear=parseInt(String(r.publicationYear||"").slice(0,4),10);
  var needsHuman=Boolean(r.needsReview)||type==="Jewelry"||type==="Antique / Collectible"||(type==="Book"&&Number.isFinite(vintageYear)&&vintageYear<1950);
  $("#zone").value=needsHuman?"rear_restricted":(type==="Clothing"||type==="Jewelry"||type==="Home decor"||type==="Gift"?"annex_retail":"middle_retail");
