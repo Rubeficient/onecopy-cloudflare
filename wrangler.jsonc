@@ -23,6 +23,7 @@
     "STORE_EMAIL": "",
     "SHIPPING_USD": "0",
     "SQUARE_ENVIRONMENT": "sandbox",
+    "EBAY_ENVIRONMENT": "production",
     "SQUARE_APPLICATION_ID": "",
     "SQUARE_LOCATION_ID": "",
     "SQUARE_VERSION": "2026-09-16",
