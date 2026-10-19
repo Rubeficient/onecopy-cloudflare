@@ -91,7 +91,7 @@ function applyStorefrontTheme(theme){
  body.dataset.cardStyle=["minimal","framed","editorial"].includes(theme.cardStyle)?theme.cardStyle:"editorial";
  body.dataset.heroLayout=["centered","split"].includes(theme.heroLayout)?theme.heroLayout:"split";
  body.dataset.pageWidth=theme.pageWidth==="wide"?"wide":"standard";
- ["showIllustration","showBenefits","showAbout","showVisit"].forEach(function(k){body.dataset[k.replace(/^show/,"show").toLowerCase()]=theme[k]===false?"false":"true";});
+ ["showIllustration","showBenefits","showAbout","showVisit"].forEach(function(k){var dashed=k.replace(/[A-Z]/g,function(m){return "-"+m.toLowerCase()});body.setAttribute("data-"+dashed,theme[k]===false?"false":"true");});
  function put(id,value){var el=document.getElementById(id);if(el&&value!==undefined&&value!==null)el.textContent=String(value);}
  put("siteAnnouncement",theme.announcement);
  put("siteName",theme.storeName);put("siteSubtitle",theme.brandSubtitle);put("footerBrand",theme.storeName);
