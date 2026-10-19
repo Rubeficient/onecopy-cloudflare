@@ -13,6 +13,50 @@ async function auth(req,secret){if(!secret)return false;const c=req.headers.get(
 const cookie=t=>"onecopy_session="+t+"; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=28800";
 async function read(req){try{return await req.json();}catch{return null;}}
 
+
+const DEFAULT_THEME = {
+ themeId:"magic-door-editorial",themeName:"Magic Door Editorial",storeName:"Magic Door Books",
+ brandSubtitle:"A shop of stories & discoveries",announcement:"SECOND STREET, POMONA ✦ BOOKS, GAMES & CURIOUS THINGS ✦ EVERY COPY HAS A STORY",
+ heroEyebrow:"Independent bookstore · Pomona, California",heroTitleFirst:"A little mystery.",heroTitleSecond:"A lifetime of stories.",
+ heroDescription:"From beloved paperbacks to forgotten curiosities, find a book worth keeping and a story worth carrying home.",
+ catalogEyebrow:"The online shelves",catalogTitle:"Discover something unexpected.",
+ catalogDescription:"Each listed item is tracked individually. New arrivals appear as they are reviewed and ready for sale.",
+ aboutEyebrow:"A little about us",aboutTitle:"Good books never really leave us.",
+ aboutParagraph:"Magic Door Books is an independent bookstore on Second Street in Pomona. We believe a book is more than a temporary commodity: every copy carries a history, every reader brings a new one, and the right book can find its person years after it was printed.",
+ aboutParagraph2:"We're carefully building our online catalog while keeping the pleasure of discovery at the heart of the shop.",
+ visitEyebrow:"Visit us in person",visitTitle:"Come turn a few pages.",
+ visitDescription:"Second Street · Pomona, California · Explore more during the monthly Art Walk.",
+ footerTagline:"Stories worth keeping · Second Street, Pomona",
+ primary:"#173d2e",secondary:"#245541",accent:"#c38d45",accentAlt:"#b9674e",
+ background:"#f7f3e9",surface:"#fffdf7",surfaceAlt:"#f9f6ee",text:"#22271f",muted:"#697066",border:"#e4ddce",
+ announcementBg:"#112e23",announcementText:"#e8ecdf",
+ headingFont:"editorial",bodyFont:"system",buttonShape:"rounded",cardStyle:"editorial",pageWidth:"standard",heroLayout:"split",
+ showIllustration:true,showBenefits:true,showAbout:true,showVisit:true
+};
+const THEME_TEXT_FIELDS = [
+ "themeName","storeName","brandSubtitle","announcement","heroEyebrow","heroTitleFirst","heroTitleSecond","heroDescription",
+ "catalogEyebrow","catalogTitle","catalogDescription","aboutEyebrow","aboutTitle","aboutParagraph","aboutParagraph2",
+ "visitEyebrow","visitTitle","visitDescription","footerTagline"
+];
+const THEME_COLOR_FIELDS = [
+ "primary","secondary","accent","accentAlt","background","surface","surfaceAlt","text","muted","border","announcementBg","announcementText"
+];
+function normalizeTheme(input){
+ const b=input&&typeof input==="object"?input:{};
+ const out={};
+ for(const key of THEME_TEXT_FIELDS){out[key]=s(b[key]===undefined?DEFAULT_THEME[key]:b[key],key==="aboutParagraph"||key==="aboutParagraph2"||key==="heroDescription"||key==="catalogDescription"||key==="visitDescription"?900:240);}
+ for(const key of THEME_COLOR_FIELDS){const v=String(b[key]===undefined?DEFAULT_THEME[key]:b[key]);out[key]=/^#[0-9a-fA-F]{6}$/.test(v)?v:DEFAULT_THEME[key];}
+ const choices={
+  headingFont:["editorial","classic","modern"],bodyFont:["system","bookish","modern"],
+  buttonShape:["rounded","pill","square"],cardStyle:["editorial","minimal","framed"],
+  pageWidth:["standard","wide"],heroLayout:["split","centered"]
+ };
+ for(const [key,values] of Object.entries(choices)){out[key]=values.includes(b[key])?b[key]:DEFAULT_THEME[key];}
+ for(const key of ["showIllustration","showBenefits","showAbout","showVisit"])out[key]=b[key]===undefined?DEFAULT_THEME[key]:Boolean(b[key]);
+ out.themeId=s(b.themeId||DEFAULT_THEME.themeId,80).replace(/[^a-zA-Z0-9_-]/g,"-").toLowerCase()||DEFAULT_THEME.themeId;
+ return out;
+}
+
 /*
  * Make the first run safe: initialize an empty D1 database automatically,
  * and add any newer columns to an existing table without deleting its data.
@@ -83,6 +127,11 @@ async function ensureSchema(env){
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_connection (id INTEGER PRIMARY KEY CHECK(id=1), refresh_token_cipher TEXT NOT NULL, scopes TEXT NOT NULL DEFAULT '', connected_at TEXT NOT NULL, updated_at TEXT NOT NULL)").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_oauth_states (state TEXT PRIMARY KEY, session_hash TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_listings (product_id TEXT PRIMARY KEY, sku TEXT NOT NULL UNIQUE, listing_title TEXT NOT NULL DEFAULT '', listing_aspects_json TEXT NOT NULL DEFAULT '{}', offer_id TEXT NOT NULL DEFAULT '', listing_id TEXT NOT NULL DEFAULT '', listing_status TEXT NOT NULL DEFAULT 'not_listed', marketplace_id TEXT NOT NULL DEFAULT 'EBAY_US', last_error TEXT NOT NULL DEFAULT '', last_synced_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')").run();
+
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS storefront_skins (id TEXT PRIMARY KEY, name TEXT NOT NULL, theme_json TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)").run();
+ const defaultJson=JSON.stringify(normalizeTheme(DEFAULT_THEME)),schemaNow=new Date().toISOString();
+ await env.DB.prepare("INSERT OR IGNORE INTO storefront_skins (id,name,theme_json,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?)").bind(DEFAULT_THEME.themeId,DEFAULT_THEME.themeName,defaultJson,1,schemaNow,schemaNow).run();
+
  const ebayCols=await env.DB.prepare("PRAGMA table_info(ebay_listings)").all();
  if(!(ebayCols.results||[]).some(c=>c.name==="listing_title"))await env.DB.prepare("ALTER TABLE ebay_listings ADD COLUMN listing_title TEXT NOT NULL DEFAULT ''").run();
  if(!(ebayCols.results||[]).some(c=>c.name==="listing_aspects_json"))await env.DB.prepare("ALTER TABLE ebay_listings ADD COLUMN listing_aspects_json TEXT NOT NULL DEFAULT '{}'").run();
