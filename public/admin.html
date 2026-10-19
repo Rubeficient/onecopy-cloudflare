@@ -145,7 +145,32 @@ var fieldHelp={
  "nav-receive":"Enter a newly acquired copy or product.",
  "nav-inventory":"Find records, review status, shelf location and stock.",
  "nav-warehouse":"Review what belongs in each physical zone.",
- "nav-orders":"Order panel. Customer checkout/payment processing is not yet enabled in this build."
+ "nav-orders":"Order panel. Customer checkout/payment processing is not yet enabled in this build.",
+ ebayMarketplace:"Choose the site/marketplace that matches your seller account and category IDs.",
+ ebayCurrency:"Currency for the eBay marketplace price. Keep it consistent with the selected marketplace.",
+ ebayCategory:"Use a valid leaf category for the item and marketplace. eBay required specifics differ by category.",
+ ebayLocationKey:"A unique seller-defined location key. Once created in eBay, keep using the same key.",
+ ebayLocationName:"Name displayed for the inventory location within eBay seller inventory.",
+ ebayAddress:"Actual street address for the place from which orders are shipped. Use the real business ship-from address.",
+ ebayCity:"City of the actual physical ship-from location.",
+ ebayState:"State or province of the actual ship-from location.",
+ ebayPostal:"Postal/ZIP code for the ship-from location.",
+ ebayCountry:"Two-letter country code for the ship-from location, such as US.",
+ ebayFulfillment:"ID of the saved eBay shipping/fulfillment business policy. Load policies or paste the exact ID.",
+ ebayPayment:"ID of the saved eBay payment business policy.",
+ ebayReturn:"ID of the saved eBay return business policy.",
+ ebayDuration:"Good Til Canceled is the standard duration used in this first fixed-price workflow.",
+ ebayProductSelect:"Select an approved, in-stock book for review before publishing. This first release does not bulk-publish.",
+ connectEbay:"Redirect to eBay to authorize OneCopy. OneCopy stores only an encrypted refresh token, never your eBay password.",
+ disconnectEbay:"Remove the saved seller authorization from OneCopy. This does not end existing eBay listings.",
+ refreshEbay:"Reload OneCopy eBay connection and listing status.",
+ saveEbaySettings:"Save marketplace, category, location and policy IDs used for new eBay offers.",
+ loadEbayPolicies:"Retrieve business policies from the connected seller account. Select the correct IDs and save them.",
+ loadEbayLocations:"Retrieve inventory locations already registered in the connected eBay account.",
+ createEbayLocation:"Register the ship-from location using the address entered in this form. Verify the address first.",
+ previewEbayItem:"Review title, condition, identifier, description, price and photo checks before publishing.",
+ publishEbayItem:"Creates a live eBay listing or revises the existing OneCopy-managed listing. Confirm carefully; this affects the real marketplace.",
+ copyEbayCallback:"Copy the exact callback URL that must be registered on the eBay developer app RuName."
 };
 
 /* Portable CSV backup for later channel mapping; not itself an eBay/Amazon upload template. */
