@@ -1,0 +1,43 @@
+name: Validate OneCopy
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  syntax-and-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install deployment tools
+        run: npm install
+      - name: Check Worker JavaScript syntax
+        run: npm run check
+      - name: Check inline website scripts
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          for (const file of ['public/index.html', 'public/admin.html']) {
+            const html = readFileSync(file, 'utf8');
+            const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/gi)];
+            if (!scripts.length) throw new Error('No inline script found in ' + file);
+            for (const item of scripts) new Function(item[1]);
+            console.log('Inline scripts valid:', file, scripts.length);
+          }
+          NODE
+      - name: Validate empty-start D1 migration
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          conn = sqlite3.connect(':memory:')
+          conn.executescript(Path('migrations/0001_onecopy.sql').read_text())
+          names = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          assert {'products', 'orders', 'admin_login_attempts'} <= names, names
+          assert conn.execute('SELECT COUNT(*) FROM products').fetchone()[0] == 0
+          print('D1 schema valid; inventory starts empty.')
+          PY
