@@ -216,8 +216,8 @@ function msg(el,t,err){el.textContent=t;el.classList.remove("hidden","error");if
 function notice(t,err){var target=$("#globalNotice")||$("#notice");msg(target,t,err)}
 async function api(path,opts){opts=opts||{};opts.credentials="same-origin";opts.headers=Object.assign({"content-type":"application/json"},opts.headers||{});var r=await fetch(path,opts),d=await r.json().catch(function(){return {error:"Unexpected server response"}});if(!r.ok)throw Error(d.error||("HTTP "+r.status));return d}
 function loginView(){$("#login").classList.remove("hidden");$("#app").classList.add("hidden")}
-async function appView(){$("#login").classList.add("hidden");$("#app").classList.remove("hidden");setView("overview");await Promise.all([loadProducts(),loadOrders()]);await loadEbayPanel();handleEbayReturnMessage()}
-function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#title").focus()},60);if(name==="ebay")setTimeout(function(){loadEbayPanel()},30)}
+async function appView(){$("#login").classList.add("hidden");$("#app").classList.remove("hidden");setView("overview");await Promise.all([loadProducts(),loadOrders(),loadThemeLibrary()]);await loadEbayPanel();handleEbayReturnMessage()}
+function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#title").focus()},60);if(name==="ebay")setTimeout(function(){loadEbayPanel()},30);if(name==="design")setTimeout(function(){if(!themeLibraryLoaded)loadThemeLibrary();else sendThemePreview()},30)}
 document.querySelectorAll("[data-nav]").forEach(function(b){b.addEventListener("click",function(){setView(b.dataset.nav)})});
 $("#loginForm").addEventListener("submit",async function(e){e.preventDefault();try{await api("/api/admin/login",{method:"POST",body:JSON.stringify({password:$("#password").value})});$("#password").value="";await appView()}catch(err){msg($("#loginMsg"),err.message,true)}});
 $("#logout").addEventListener("click",async function(){try{await api("/api/admin/logout",{method:"POST",body:"{}"})}catch(e){}loginView()});
@@ -286,6 +286,40 @@ var fieldHelp={
  publishEbayItem:"Creates a live eBay listing or revises the existing OneCopy-managed listing. Confirm carefully; this affects the real marketplace.",
  copyEbayCallback:"Copy the exact callback URL that must be registered on the eBay developer app RuName."
 };
+Object.assign(fieldHelp,{
+ themeSavedSkinSelect:"Choose a previously saved storefront skin. Loading a saved skin into the editor does not make it live.",
+ themeSkinName:"The human-readable name used to identify this set of storefront colors, type, layout and content.",
+ themePresetSelect:"Choose a starter style. Applying a preset changes the editor/preview but does not save or activate it.",
+ themeLoadSaved:"Load the selected saved theme into the editor without changing the public storefront.",
+ themeApplyPreset:"Apply the visual palette, typography and layout of the selected preset while keeping the current shop's content.",
+ themeSaveChanges:"Update the saved skin currently loaded into the editor. If it is active, these changes become the public theme.",
+ themeSaveNew:"Save the current editor settings as a separate, inactive skin so the existing public theme remains unchanged.",
+ themeActivate:"Save the current editor skin and switch the public website to it. This affects every visitor to the storefront.",
+ themePreviewFrame:"A live rendering of the public storefront. Unsaved edits are preview-only until saved and activated.",
+ theme-primary:"Primary brand color: key buttons, strong backgrounds and the main brand mark. Keep enough contrast for white text.",
+ theme-secondary:"Secondary brand color used for highlighted headings, secondary elements and the visual hierarchy.",
+ theme-accent:"Accent color for small highlights and decorative emphasis; avoid using it for long passages of text.",
+ theme-accentAlt:"A second accent for category labels and small details. Use it sparingly so the design remains coherent.",
+ theme-background:"The page canvas color behind sections. Check body text readability across the full page.",
+ theme-surface:"The main surface color used by product cards and panels.",
+ theme-surfaceAlt:"A softer supporting surface for strips, muted panels and quiet backgrounds.",
+ theme-text:"Main text color. Choose a shade that contrasts strongly with the page and card surfaces.",
+ theme-muted:"Secondary copy, labels and supporting details. Muted text should remain readable, not merely faint.",
+ theme-border:"Dividers, card edges and input outlines.",
+ theme-announcementBg:"Background color for the top announcement strip.",
+ theme-announcementText:"Text color for the announcement strip. Check contrast against the strip background.",
+ theme-headingFont:"Display face for large headings and product titles.",
+ theme-bodyFont:"Reading face for navigation, product details, prices and longer paragraphs.",
+ theme-buttonShape:"Choose rounded, pill-shaped or crisp square controls consistently across the storefront.",
+ theme-cardStyle:"Editorial cards add a restrained border; Minimal removes visual weight; Framed uses a bolder graphic edge.",
+ theme-pageWidth:"Standard width feels focused; Wide creates a broader catalogue/gallery.",
+ theme-heroLayout:"Split pairs copy with the book-stack illustration. Centered gives the intro a poster-like composition.",
+ theme-showIllustration:"Show or hide the illustrated book stack in the hero area.",
+ theme-showBenefits:"Show or hide the three-part shop values strip under the hero.",
+ theme-showAbout:"Show or hide the shop story section.",
+ theme-showVisit:"Show or hide the physical visit/location callout."
+});
+
 
 /* Portable CSV backup for later channel mapping; not itself an eBay/Amazon upload template. */
 function csvQuote(value){
@@ -497,6 +531,166 @@ async function loadEbayPanel(){
   if(e.message.indexOf("sign in")>=0)loginView();
  }
 }
+
+var savedThemeSkins=[],activeThemeId="",editingThemeId="",themeLibraryLoaded=false,themePreviewTimer=null;
+var themePresetStyles={
+ "magic-door":{primary:"#173d2e",secondary:"#245541",accent:"#c38d45",accentAlt:"#b9674e",background:"#f7f3e9",surface:"#fffdf7",surfaceAlt:"#f9f6ee",text:"#22271f",muted:"#697066",border:"#e4ddce",announcementBg:"#112e23",announcementText:"#e8ecdf",headingFont:"editorial",bodyFont:"system",buttonShape:"rounded",cardStyle:"editorial",pageWidth:"standard",heroLayout:"split",showIllustration:true,showBenefits:true,showAbout:true,showVisit:true},
+ "modern-bookshop":{primary:"#263b50",secondary:"#4c7187",accent:"#d18a43",accentAlt:"#af6551",background:"#f4f5f2",surface:"#ffffff",surfaceAlt:"#e8eef0",text:"#202a31",muted:"#68747b",border:"#d9e0e4",announcementBg:"#1b2d3b",announcementText:"#f4f5f1",headingFont:"modern",bodyFont:"system",buttonShape:"rounded",cardStyle:"minimal",pageWidth:"wide",heroLayout:"centered",showIllustration:false,showBenefits:true,showAbout:true,showVisit:true},
+ "midnight-gallery":{primary:"#222735",secondary:"#647b91",accent:"#d6ad6c",accentAlt:"#ac8bb4",background:"#171a22",surface:"#242a35",surfaceAlt:"#2d3440",text:"#f1ebdf",muted:"#bcc0c6",border:"#424a58",announcementBg:"#0c0e13",announcementText:"#eee7d8",headingFont:"classic",bodyFont:"system",buttonShape:"square",cardStyle:"framed",pageWidth:"wide",heroLayout:"split",showIllustration:true,showBenefits:false,showAbout:true,showVisit:true},
+ "botanical-archive":{primary:"#264b3b",secondary:"#527a60",accent:"#d9ae63",accentAlt:"#9a6b52",background:"#edf1e5",surface:"#fbfcf6",surfaceAlt:"#dce6d6",text:"#243329",muted:"#68786c",border:"#cdd9ca",announcementBg:"#193528",announcementText:"#e9f0e2",headingFont:"classic",bodyFont:"bookish",buttonShape:"pill",cardStyle:"editorial",pageWidth:"standard",heroLayout:"split",showIllustration:true,showBenefits:true,showAbout:true,showVisit:true},
+ "studio-minimal":{primary:"#202322",secondary:"#5e6662",accent:"#c28a49",accentAlt:"#9b604d",background:"#f3f3ef",surface:"#ffffff",surfaceAlt:"#e8e9e4",text:"#222725",muted:"#6e746f",border:"#d9dcd6",announcementBg:"#202322",announcementText:"#f4f4ee",headingFont:"modern",bodyFont:"modern",buttonShape:"square",cardStyle:"minimal",pageWidth:"wide",heroLayout:"centered",showIllustration:false,showBenefits:false,showAbout:true,showVisit:true},
+ "sunset-paper":{primary:"#51352f",secondary:"#7a4b43",accent:"#d49a57",accentAlt:"#a35f4b",background:"#f7eadf",surface:"#fff7ef",surfaceAlt:"#f2d8c5",text:"#3b2b27",muted:"#7d6a5f",border:"#e6cbb7",announcementBg:"#392521",announcementText:"#ffe9d2",headingFont:"editorial",bodyFont:"bookish",buttonShape:"rounded",cardStyle:"framed",pageWidth:"standard",heroLayout:"split",showIllustration:true,showBenefits:true,showAbout:true,showVisit:true}
+};
+function themeStatus(textValue,isError){
+ var el=$("#themeStudioStatus");el.textContent=textValue;el.classList.toggle("error",Boolean(isError));
+}
+function readThemeEditor(){
+ var theme={};
+ document.querySelectorAll("[data-theme-field]").forEach(function(control){
+  var key=control.dataset.themeField;
+  theme[key]=control.type==="checkbox"?control.checked:control.value;
+ });
+ theme.themeName=$("#themeSkinName").value.trim()||"My custom skin";
+ theme.themeId=editingThemeId||"magic-door-editorial";
+ return theme;
+}
+function applyThemeEditor(theme){
+ if(!theme)return;
+ document.querySelectorAll("[data-theme-field]").forEach(function(control){
+  var key=control.dataset.themeField,value=theme[key];
+  if(value===undefined||value===null)return;
+  if(control.type==="checkbox")control.checked=Boolean(value);
+  else if(control.type==="color"){
+   if(/^#[0-9a-fA-F]{6}$/.test(String(value)))control.value=value;
+  }else control.value=String(value);
+ });
+ if(theme.themeName)$("#themeSkinName").value=theme.themeName;
+ updateThemeSwatches();
+ sendThemePreview();
+}
+function updateThemeSwatches(){
+ var host=$("#themeSwatchRow");if(!host)return;
+ host.innerHTML=["primary","secondary","accent","accentAlt","background","surface","surfaceAlt","text","muted","border"].map(function(k){
+  var v=$("#theme-"+k);return v?'<div class="studio-swatch" title="'+esc(k)+': '+esc(v.value)+'" style="background:'+esc(v.value)+'"></div>':"";
+ }).join("");
+}
+function sendThemePreview(){
+ if(themePreviewTimer)clearTimeout(themePreviewTimer);
+ themePreviewTimer=setTimeout(function(){
+  var frame=$("#themePreviewFrame");
+  if(frame&&frame.contentWindow)frame.contentWindow.postMessage({type:"onecopy-theme-preview",theme:readThemeEditor()},window.location.origin);
+  $("#themePreviewMode").textContent=$("#themePreviewWrap").classList.contains("mobile")?"Mobile":"Desktop";
+ },70);
+}
+function refreshThemeMenu(selectId){
+ var select=$("#themeSavedSkinSelect"),skins=savedThemeSkins;
+ select.innerHTML=skins.map(function(skin){return '<option value="'+esc(skin.id)+'">'+(skin.is_active?"● LIVE · ":"")+esc(skin.name)+'</option>'}).join("");
+ if(!skins.length)select.innerHTML='<option value="">No saved skins</option>';
+ if(selectId&&skins.some(function(x){return x.id===selectId}))select.value=selectId;
+ var active=skins.find(function(x){return x.is_active});
+ activeThemeId=active?active.id:"";
+ $("#themeActiveBadge").textContent=active?"LIVE · "+active.name:"No active skin";
+ $("#themeActiveBadge").className="pill "+(active?"green":"gold");
+ $("#themeActiveName").textContent=active?active.name:"None";
+ $("#themeSavedCount").textContent=skins.length;
+}
+async function loadThemeLibrary(){
+ try{
+  var data=await api("/api/admin/themes");
+  savedThemeSkins=data.skins||[];
+  var active=savedThemeSkins.find(function(x){return x.is_active})||savedThemeSkins[0];
+  refreshThemeMenu(editingThemeId||active&&active.id);
+  if(!themeLibraryLoaded&&active){
+   editingThemeId=active.id;
+   $("#themeSavedSkinSelect").value=active.id;
+   applyThemeEditor(active.theme);
+   $("#themeSkinName").value=active.name;
+   themeLibraryLoaded=true;
+   themeStatus("Loaded active skin. Experiment freely; edits are preview-only until saved.",false);
+  }else if(!themeLibraryLoaded){
+   applyThemeEditor(data.defaults||{});
+   themeLibraryLoaded=true;
+  }else sendThemePreview();
+ }catch(e){themeStatus("Could not load saved skins: "+e.message,true);if(e.message.indexOf("sign in")>=0)loginView()}
+}
+async function refreshThemeLibrary(selectedId){
+ var data=await api("/api/admin/themes");
+ savedThemeSkins=data.skins||[];
+ refreshThemeMenu(selectedId||editingThemeId);
+}
+function loadSelectedSkin(){
+ var id=$("#themeSavedSkinSelect").value,skin=savedThemeSkins.find(function(x){return x.id===id});
+ if(!skin){themeStatus("Choose a saved skin first.",true);return;}
+ editingThemeId=skin.id;
+ applyThemeEditor(skin.theme);
+ $("#themeSkinName").value=skin.name;
+ themeStatus("Loaded '"+skin.name+"' into the editor. The public shop has not switched skins.",false);
+}
+function applySelectedPreset(){
+ var id=$("#themePresetSelect").value,style=themePresetStyles[id];
+ if(!style){themeStatus("Choose a preset first.",true);return;}
+ var updated=Object.assign({},readThemeEditor(),style);
+ applyThemeEditor(updated);
+ themeStatus("Preset applied to the editor preview. Save as a new skin to keep it in the library.",false);
+}
+async function saveCurrentSkin(){
+ if(!editingThemeId){return await saveAsNewSkin(false);}
+ var name=$("#themeSkinName").value.trim()||"My custom skin";
+ var theme=readThemeEditor();theme.themeName=name;theme.themeId=editingThemeId;
+ var result=await api("/api/admin/themes/"+encodeURIComponent(editingThemeId),{method:"PUT",body:JSON.stringify({name:name,theme:theme})});
+ await refreshThemeLibrary(editingThemeId);
+ themeStatus("Saved changes to '"+result.name+"'. "+(result.is_active?"The live storefront now uses this saved skin.":"This skin is saved but not active on the public storefront."),false);
+ return result.id;
+}
+async function saveAsNewSkin(announce){
+ var name=$("#themeSkinName").value.trim();
+ if(!name){themeStatus("Give the new skin a name first.",true);$("#themeSkinName").focus();return null;}
+ var theme=readThemeEditor();theme.themeName=name;
+ var result=await api("/api/admin/themes",{method:"POST",body:JSON.stringify({name:name,theme:theme})});
+ editingThemeId=result.id;
+ await refreshThemeLibrary(result.id);
+ $("#themeSkinName").value=result.name;
+ if(announce!==false)themeStatus("Saved '"+result.name+"' as a new inactive skin. Preview it or activate it when ready.",false);
+ return result.id;
+}
+async function activateCurrentSkin(){
+ try{
+  var id=await saveCurrentSkin();if(!id)return;
+  const result=await api("/api/admin/themes/"+encodeURIComponent(id)+"/activate",{method:"POST",body:"{}"});
+  activeThemeId=id;
+  await refreshThemeLibrary(id);
+  themeStatus("'"+result.name+"' is now the active public storefront skin.",false);
+  sendThemePreview();
+ }catch(e){themeStatus("Skin activation failed: "+e.message,true)}
+}
+function scheduleThemeSave(action){
+ return async function(){
+  var btn=this,old=btn.textContent;
+  btn.disabled=true;btn.textContent="Working…";
+  try{await action.call(this)}catch(e){themeStatus("Theme action failed: "+e.message,true)}
+  finally{btn.disabled=false;btn.textContent=old}
+ };
+}
+$("#themeLoadSaved").addEventListener("click",loadSelectedSkin);
+$("#themeApplyPreset").addEventListener("click",applySelectedPreset);
+$("#themeSaveChanges").addEventListener("click",scheduleThemeSave(saveCurrentSkin));
+$("#themeSaveNew").addEventListener("click",scheduleThemeSave(function(){return saveAsNewSkin(true)}));
+$("#themeActivate").addEventListener("click",scheduleThemeSave(activateCurrentSkin));
+document.querySelectorAll("[data-theme-field]").forEach(function(control){
+ control.addEventListener("input",function(){updateThemeSwatches();sendThemePreview()});
+ control.addEventListener("change",function(){updateThemeSwatches();sendThemePreview()});
+});
+$("#themeSkinName").addEventListener("input",function(){sendThemePreview()});
+$("#themePreviewFrame").addEventListener("load",sendThemePreview);
+document.querySelectorAll("[data-theme-preview-size]").forEach(function(btn){
+ btn.addEventListener("click",function(){
+  var mobile=btn.dataset.themePreviewSize==="mobile";
+  $("#themePreviewWrap").classList.toggle("mobile",mobile);
+  $("#themePreviewMode").textContent=mobile?"Mobile":"Desktop";
+  document.querySelectorAll("[data-theme-preview-size]").forEach(function(b){b.classList.toggle("gold",b===btn);b.classList.toggle("secondary",b!==btn)});
+ });
+});
+
 function handleEbayReturnMessage(){
  var params=new URLSearchParams(window.location.search),flag=params.get("ebay");
  if(flag==="connected"){notice("eBay seller account connected. Configure policies and your ship-from inventory location before listing.");setView("ebay");loadEbayPanel();}
