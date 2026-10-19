@@ -82,9 +82,10 @@ async function ensureSchema(env){
  await env.DB.prepare("INSERT OR IGNORE INTO ebay_settings (id,marketplace_id,currency,merchant_location_key,location_name,city,state_or_province,country,listing_duration) VALUES (1,'EBAY_US','USD','magic-door-books','Magic Door Books','Pomona','CA','US','GTC')").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_connection (id INTEGER PRIMARY KEY CHECK(id=1), refresh_token_cipher TEXT NOT NULL, scopes TEXT NOT NULL DEFAULT '', connected_at TEXT NOT NULL, updated_at TEXT NOT NULL)").run();
  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_oauth_states (state TEXT PRIMARY KEY, session_hash TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)").run();
- await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_listings (product_id TEXT PRIMARY KEY, sku TEXT NOT NULL UNIQUE, listing_title TEXT NOT NULL DEFAULT '', offer_id TEXT NOT NULL DEFAULT '', listing_id TEXT NOT NULL DEFAULT '', listing_status TEXT NOT NULL DEFAULT 'not_listed', marketplace_id TEXT NOT NULL DEFAULT 'EBAY_US', last_error TEXT NOT NULL DEFAULT '', last_synced_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')").run();
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS ebay_listings (product_id TEXT PRIMARY KEY, sku TEXT NOT NULL UNIQUE, listing_title TEXT NOT NULL DEFAULT '', listing_aspects_json TEXT NOT NULL DEFAULT '{}', offer_id TEXT NOT NULL DEFAULT '', listing_id TEXT NOT NULL DEFAULT '', listing_status TEXT NOT NULL DEFAULT 'not_listed', marketplace_id TEXT NOT NULL DEFAULT 'EBAY_US', last_error TEXT NOT NULL DEFAULT '', last_synced_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')").run();
  const ebayCols=await env.DB.prepare("PRAGMA table_info(ebay_listings)").all();
  if(!(ebayCols.results||[]).some(c=>c.name==="listing_title"))await env.DB.prepare("ALTER TABLE ebay_listings ADD COLUMN listing_title TEXT NOT NULL DEFAULT ''").run();
+ if(!(ebayCols.results||[]).some(c=>c.name==="listing_aspects_json"))await env.DB.prepare("ALTER TABLE ebay_listings ADD COLUMN listing_aspects_json TEXT NOT NULL DEFAULT '{}'").run();
 }
 
 const EBAY_SCOPES = [
@@ -234,10 +235,59 @@ async function ebayApiSetupStatus(env,url){
  const settings=await loadEbaySettings(env);
  const connection=await env.DB.prepare("SELECT connected_at,updated_at,scopes FROM ebay_connection WHERE id=1").first();
  const summary=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN listing_status='published' THEN 1 ELSE 0 END) AS published,SUM(CASE WHEN last_error!='' THEN 1 ELSE 0 END) AS errors FROM ebay_listings").first();
- const rows=await env.DB.prepare("SELECT l.product_id,l.sku,l.listing_title,l.offer_id,l.listing_id,l.listing_status,l.marketplace_id,l.last_error,l.last_synced_at,l.updated_at,p.title,p.price,p.status AS product_status,p.review_status,p.zone FROM ebay_listings l LEFT JOIN products p ON p.id=l.product_id ORDER BY l.updated_at DESC LIMIT 500").all();
+ const rows=await env.DB.prepare("SELECT l.product_id,l.sku,l.listing_title,l.listing_aspects_json,l.offer_id,l.listing_id,l.listing_status,l.marketplace_id,l.last_error,l.last_synced_at,l.updated_at,p.title,p.price,p.status AS product_status,p.review_status,p.zone FROM ebay_listings l LEFT JOIN products p ON p.id=l.product_id ORDER BY l.updated_at DESC LIMIT 500").all();
  return {configured:ebayAppConfigured(env),missingSecrets:ebayMissingAppConfig(env),connected:Boolean(connection&&connection.connected_at),connectedAt:connection&&connection.connected_at||"",scopes:connection&&connection.scopes||"",environment:ebayMode(env),callbackUrl:url.origin+"/api/ebay/callback",settings,summary:summary||{total:0,published:0,errors:0},listings:rows.results||[]};
 }
-async function publishEbayItem(env,productId,titleOverride){
+
+async function getEbayCategoryAspects(env,accessToken,marketplaceId,categoryId){
+ const marketplace=s(marketplaceId||"EBAY_US",20),category=s(categoryId,30);
+ if(!category)throw new Error("Enter and save the eBay leaf category ID before loading category requirements.");
+ const tree=await ebayRequest(env,"/commerce/taxonomy/v1/get_default_category_tree_id?marketplace_id="+encodeURIComponent(marketplace),{method:"GET"},accessToken);
+ const treeId=s(tree.data&&tree.data.categoryTreeId,40);
+ if(!treeId)throw new Error("eBay did not return a category tree for "+marketplace+".");
+ const response=await ebayRequest(env,"/commerce/taxonomy/v1/category_tree/"+encodeURIComponent(treeId)+"/get_item_aspects_for_category?category_id="+encodeURIComponent(category),{method:"GET"},accessToken);
+ const aspects=Array.isArray(response.data&&response.data.aspects)?response.data.aspects:[];
+ return aspects.map(a=>{
+  const constraint=a.aspectConstraint||{};
+  return {
+   name:s(a.localizedAspectName,100),
+   required:Boolean(constraint.aspectRequired),
+   usage:s(constraint.aspectUsage,30),
+   dataType:s(constraint.aspectDataType,30),
+   cardinality:s(constraint.itemToAspectCardinality,20),
+   values:(Array.isArray(a.aspectValues)?a.aspectValues:[]).slice(0,200).map(v=>s(v.localizedValue||v.value,200)).filter(Boolean)
+  };
+ }).filter(a=>a.name);
+}
+function cleanListingAspects(input,definitions,item){
+ let supplied={};
+ try{
+  if(input&&typeof input==="object"&&!Array.isArray(input))supplied=input;
+  else if(typeof input==="string")supplied=JSON.parse(input||"{}");
+ }catch{}
+ let prior={};
+ if(item&&item.listing_aspects_json){try{prior=JSON.parse(item.listing_aspects_json)||{};}catch{}}
+ const combined={...prior};
+ for(const [name,value] of Object.entries(supplied)){
+  if(typeof name!=="string"||!name.trim()||name.length>100)continue;
+  const values=(Array.isArray(value)?value:String(value??"").split("|")).map(v=>s(v,200)).filter(Boolean).slice(0,10);
+  if(values.length)combined[name]=values;
+ }
+ for(const def of definitions){
+  if(!def.required)continue;
+  const current=combined[def.name]||[];
+  if(current.length)continue;
+  const key=def.name.toLowerCase().replace(/[^a-z0-9]/g,"");
+  let guess="";
+  if(key==="booktitle"||key==="title")guess=s(item.title,200);
+  else if(key==="author"||key==="authors")guess=s(item.author,200);
+  else if(key==="isbn")guess=s(item.isbn,30);
+  if(guess)combined[def.name]=[guess];
+ }
+ return combined;
+}
+
+async function publishEbayItem(env,productId,titleOverride,submittedAspects){
  const row=await env.DB.prepare("SELECT * FROM products WHERE id=?").bind(productId).first();
  if(!row)throw new Error("Inventory item not found.");
  const item=toAdmin(row);
@@ -265,9 +315,13 @@ async function publishEbayItem(env,productId,titleOverride){
  if(missing.length)throw new Error("Complete eBay setup first: "+missing.join(", ")+".");
  if(!env.EBAY_CLIENT_ID||!env.EBAY_CLIENT_SECRET||!env.EBAY_TOKEN_ENCRYPTION_KEY)throw new Error("One or more eBay Cloudflare secrets are missing.");
  const access=await ebayAccessToken(env);
+ const categoryAspects=await getEbayCategoryAspects(env,access,settings.marketplace_id||"EBAY_US",settings.category_id);
+ const listingAspects=cleanListingAspects(submittedAspects,categoryAspects,prior&&prior.listing_aspects_json?prior:item);
+ const missingAspects=categoryAspects.filter(a=>a.required&&!(listingAspects[a.name]||[]).length);
+ if(missingAspects.length)throw new Error("Fill the required eBay item specifics: "+missingAspects.map(a=>a.name).join(", ")+". Use Load required item specifics in the preview panel.");
  const sku=prior&&prior.sku?prior.sku:String(item.id);
  const isbn=String(item.isbn||"").replace(/[^0-9Xx]/g,"").toUpperCase();
- const product={title:listingTitle,description:String(item.description||("Condition: "+item.condition)).slice(0,5000),imageUrls:item.image_url?[item.image_url]:[],aspects:{"Book Title":[String(item.title).slice(0,200)]}};
+ const product={title:listingTitle,description:String(item.description||("Condition: "+item.condition)).slice(0,5000),imageUrls:item.image_url?[item.image_url]:[],aspects:{...listingAspects,"Book Title":[String(item.title).slice(0,200)]}};
  if(item.author)product.aspects.Author=[String(item.author).slice(0,200)];
  if(/^(?:\d{9}[\dX]|\d{13})$/.test(isbn))product.isbn=[isbn];
  const conditions={"As New":"LIKE_NEW","Very Good":"USED_VERY_GOOD","Good":"USED_GOOD","Acceptable":"USED_ACCEPTABLE","Fair":"USED_ACCEPTABLE"};
@@ -294,17 +348,17 @@ async function publishEbayItem(env,productId,titleOverride){
    offerId=String(created.data.offerId||"");
    if(!offerId)throw new Error("eBay created an offer but did not return its offer ID.");
   }
-  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,listing_title,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,listing_title=excluded.listing_title,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,listingTitle,offerId,listingId,listingId?"published":"draft",settings.marketplace_id,now(),now()).run();
+  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,listing_title,listing_aspects_json,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,listing_title=excluded.listing_title,listing_aspects_json=excluded.listing_aspects_json,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,listingTitle,JSON.stringify(listingAspects),offerId,listingId,listingId?"published":"draft",settings.marketplace_id,now(),now()).run();
   if(!listingId){
    const published=await ebayRequest(env,"/sell/inventory/v1/offer/"+encodeURIComponent(offerId)+"/publish",{method:"POST",body:"{}"},access);
    listingId=String(published.data.listingId||"");
    if(!listingId)throw new Error("eBay accepted the publish request but returned no listing ID. Check eBay Seller Hub before retrying.");
   }
-  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,listing_title,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,listing_title=excluded.listing_title,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,listingTitle,offerId,listingId,"published",settings.marketplace_id,now(),now()).run();
+  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,listing_title,listing_aspects_json,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?,?,'',?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,listing_title=excluded.listing_title,listing_aspects_json=excluded.listing_aspects_json,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,marketplace_id=excluded.marketplace_id,last_error='',last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,listingTitle,JSON.stringify(listingAspects),offerId,listingId,"published",settings.marketplace_id,now(),now()).run();
   return {ok:true,product_id:productId,sku,listing_title:listingTitle,offer_id:offerId,listing_id:listingId,status:"published",message:prior&&prior.listing_id?"Existing eBay listing updated.":"Listing published to eBay."};
  }catch(e){
   const message=String(e&&e.message||"eBay request failed").slice(0,1000);
-  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,listing_title,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,listing_title=excluded.listing_title,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,last_error=excluded.last_error,last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,listingTitle,offerId,listingId,listingId?"published":"error",settings.marketplace_id,message,now(),now()).run();
+  await env.DB.prepare("INSERT INTO ebay_listings (product_id,sku,listing_title,listing_aspects_json,offer_id,listing_id,listing_status,marketplace_id,last_error,last_synced_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(product_id) DO UPDATE SET sku=excluded.sku,listing_title=excluded.listing_title,listing_aspects_json=excluded.listing_aspects_json,offer_id=excluded.offer_id,listing_id=excluded.listing_id,listing_status=excluded.listing_status,last_error=excluded.last_error,last_synced_at=excluded.last_synced_at,updated_at=excluded.updated_at").bind(productId,sku,listingTitle,JSON.stringify(listingAspects),offerId,listingId,listingId?"published":"error",settings.marketplace_id,message,now(),now()).run();
   throw e;
  }
 }
@@ -382,10 +436,19 @@ async function api(req,env,url){
   if(p==="/api/admin/ebay/listings"&&method==="GET"){
    const status=await ebayApiSetupStatus(env,url);return json({listings:status.listings,summary:status.summary});
   }
+  if(p==="/api/admin/ebay/category-aspects"&&method==="GET"){
+   const settings=await loadEbaySettings(env);
+   const categoryId=s(url.searchParams.get("category_id")||settings.category_id,30);
+   const marketplaceId=s(url.searchParams.get("marketplace_id")||settings.marketplace_id||"EBAY_US",20);
+   if(!categoryId)return json({error:"Enter an eBay leaf category ID first."},400);
+   const access=await ebayAccessToken(env);
+   const aspects=await getEbayCategoryAspects(env,access,marketplaceId,categoryId);
+   return json({marketplace_id:marketplaceId,category_id:categoryId,aspects});
+  }
   const publishMatch=p.match(/^\/api\/admin\/ebay\/products\/([^/]+)\/publish$/);
   if(publishMatch&&method==="POST"){
    const b=await read(req)||{};
-   try{return json(await publishEbayItem(env,decodeURIComponent(publishMatch[1]),b.listing_title));}
+   try{return json(await publishEbayItem(env,decodeURIComponent(publishMatch[1]),b.listing_title,b.listing_aspects));}
    catch(e){return json({error:String(e&&e.message||"eBay listing failed"),status:e&&e.status||0},e&&e.status>=500?502:400);}
   }
   const withdrawMatch=p.match(/^\/api\/admin\/ebay\/products\/([^/]+)\/withdraw$/);
