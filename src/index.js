@@ -492,6 +492,8 @@ async function analyzeItemCapture(body,env){
    body:JSON.stringify({
     model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100),
     tools:[{type:"web_search"}],
+    tool_choice:"required",
+    include:["web_search_call.action.sources"],
     input:[{role:"user",content}],
     text:{format:{type:"json_schema",name:"onecopy_item_capture",strict:true,schema:ITEM_CAPTURE_SCHEMA}},
     max_output_tokens:3500
