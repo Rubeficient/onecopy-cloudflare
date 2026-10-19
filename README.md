@@ -53,3 +53,12 @@ The admin page includes an eBay-first listing workflow. It supports seller OAuth
 ### Important boundary of the first eBay release
 
 This first release can publish and revise the eBay-managed offer when you manually preview and confirm. It does **not yet import eBay orders, automatically detect an eBay sale, or synchronize sold inventory across eBay and OneCopy**. Keep checking orders in eBay Seller Hub and update OneCopy stock until order synchronization is implemented. A successful JavaScript syntax check is not the same as an end-to-end eBay account test; real publishing depends on your credentials, seller eligibility, category requirements, inventory location, photos, and valid business policies.
+
+
+## Website Design Studio and saved skins
+
+The admin panel now includes **Website Design Studio**. It provides six starter directions (Magic Door Editorial, Modern Bookshop, Midnight Gallery, Botanical Archive, Studio Minimal, and Sunset Paper), role-based color controls, heading/body type choices, button shape, product-card style, content width, hero layout, homepage section visibility, and editable storefront copy. Use the embedded desktop/mobile preview to experiment before saving or activating a theme.
+
+Skin data is stored in the D1 `storefront_skins` table separately from product and valuation records. The public storefront reads the active skin from `/api/storefront/theme`; the admin endpoints list, save, update, and activate named skins. Preview messages are browser-only until a skin is saved. Saving changes to the currently active skin updates the live storefront; saving as a new skin leaves the active public design unchanged until you activate it.
+
+This first editor is a token-based skin editor for the existing storefront template—not yet a free-form drag-and-drop page builder. It intentionally changes brand content, colors and layout choices without changing inventory, pricing or sales-channel settings.
