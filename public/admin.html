@@ -62,7 +62,7 @@
      <div class="ebayfield"><label for="ebayMarketplace">MARKETPLACE</label><select id="ebayMarketplace"><option value="EBAY_US">eBay United States</option><option value="EBAY_CA">eBay Canada</option><option value="EBAY_GB">eBay United Kingdom</option><option value="EBAY_AU">eBay Australia</option></select><small>Start with the marketplace where your seller account is active.</small></div>
      <div class="ebayfield"><label for="ebayCurrency">CURRENCY</label><select id="ebayCurrency"><option value="USD">USD — US Dollar</option><option value="CAD">CAD — Canadian Dollar</option><option value="GBP">GBP — Pound Sterling</option><option value="AUD">AUD — Australian Dollar</option></select></div>
      <div class="ebayfield"><label for="ebayCategory">DEFAULT eBAY CATEGORY ID</label><input id="ebayCategory" placeholder="Enter correct leaf category ID"><small>Use the category ID valid for this item type and marketplace. Category requirements can vary; do not guess.</small></div>
-     <div class="ebayfield"><label for="ebayLocationKey">MERCHANT LOCATION KEY</label><input id="ebayLocationKey" value="magic-door-books" maxlength="50"><small>A unique internal key for the location from which sold goods ship.</small></div>
+     <div class="ebayfield"><label for="ebayLocationKey">MERCHANT LOCATION KEY</label><input id="ebayLocationKey" list="ebayLocationKeys" value="magic-door-books" maxlength="50"><datalist id="ebayLocationKeys"></datalist><small>A unique internal key for the location from which sold goods ship.</small></div>
      <div class="ebayfield"><label for="ebayLocationName">SHIP-FROM LOCATION NAME</label><input id="ebayLocationName" value="Magic Door Books"></div>
      <div class="ebayfield"><label for="ebayAddress">STREET ADDRESS (OPTIONAL)</label><input id="ebayAddress" placeholder="Store street address"></div>
      <div class="ebayfield"><label for="ebayCity">CITY</label><input id="ebayCity" value="Pomona"></div>
@@ -95,15 +95,15 @@
 <section id="ordersPanel" data-panel="orders" class="hidden"><section class="panel"><div class="panel-head"><div><div class="kicker">Fulfillment</div><h2>Orders</h2><p class="explain">Orders are shown here once an order/payment workflow is connected.</p></div><span class="pill gold">CHECKOUT NOT LIVE</span></div><div id="orders" class="sub">No orders loaded.</div><div class="message">This deployment is currently a catalog and inventory prototype. It is not collecting customer payments yet.</div></section></section>
 </div></div></section>
 <script>
-var $=function(s){return document.querySelector(s)},inventoryRows=[];
+var $=function(s){return document.querySelector(s)},inventoryRows=[],ebayStatusData=null,ebayPreviewItem=null,ebaySettingsLoaded=false;
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function fmt(v){return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(Number(v)||0)}
 function msg(el,t,err){el.textContent=t;el.classList.remove("hidden","error");if(err)el.classList.add("error")}
 function notice(t,err){var target=$("#globalNotice")||$("#notice");msg(target,t,err)}
 async function api(path,opts){opts=opts||{};opts.credentials="same-origin";opts.headers=Object.assign({"content-type":"application/json"},opts.headers||{});var r=await fetch(path,opts),d=await r.json().catch(function(){return {error:"Unexpected server response"}});if(!r.ok)throw Error(d.error||("HTTP "+r.status));return d}
 function loginView(){$("#login").classList.remove("hidden");$("#app").classList.add("hidden")}
-async function appView(){$("#login").classList.add("hidden");$("#app").classList.remove("hidden");setView("overview");await Promise.all([loadProducts(),loadOrders()])}
-function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#title").focus()},60)}
+async function appView(){$("#login").classList.add("hidden");$("#app").classList.remove("hidden");setView("overview");await Promise.all([loadProducts(),loadOrders()]);await loadEbayPanel();handleEbayReturnMessage()}
+function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#title").focus()},60);if(name==="ebay")setTimeout(function(){loadEbayPanel()},30)}
 document.querySelectorAll("[data-nav]").forEach(function(b){b.addEventListener("click",function(){setView(b.dataset.nav)})});
 $("#loginForm").addEventListener("submit",async function(e){e.preventDefault();try{await api("/api/admin/login",{method:"POST",body:JSON.stringify({password:$("#password").value})});$("#password").value="";await appView()}catch(err){msg($("#loginMsg"),err.message,true)}});
 $("#logout").addEventListener("click",async function(){try{await api("/api/admin/logout",{method:"POST",body:"{}"})}catch(e){}loginView()});
@@ -212,4 +212,172 @@ $("#products").addEventListener("click",async function(e){var b=e.target.closest
 $("#inventorySearch").addEventListener("input",renderProducts);$("#inventoryZone").addEventListener("change",renderProducts);$("#inventoryReview").addEventListener("change",renderProducts);
 $("#itemForm").addEventListener("submit",async function(e){e.preventDefault();var v=function(id){return $("#"+id).value};var body={title:v("title"),author:v("author"),isbn:v("isbn"),category:v("category"),price:Number(v("price")),msrp:Number(v("msrp")),cost:Number(v("cost")),condition:v("condition"),zone:v("zone"),location:v("location"),quantity:Number(v("quantity")),stock_mode:v("stockMode"),tpv:Number(v("tpv")),cpv:Number(v("cpv")),market_comps:v("marketComps"),valuation_basis:v("valuationBasis"),valuation_confidence:v("valuationConfidence"),signed:$("#signed").checked,first_edition:$("#firstEdition").checked,special:$("#special").checked,image_url:v("image"),description:v("description"),notes:v("notes"),review_status:"needs_partner_review",online_published:false};var saveBtn=$("#saveItemButton");saveBtn.disabled=true;saveBtn.textContent="Saving item…";try{var d=await api("/api/admin/products",{method:"POST",body:JSON.stringify(body)});$("#itemForm").reset();["price","msrp","cost","tpv","cpv"].forEach(function(id){$("#"+id).value="0"});$("#quantity").value="1";$("#zone").value="middle_retail";$("#valuationBasis").value="none";$("#valuationConfidence").value="low";await loadProducts();setView("inventory");notice("Saved "+d.id+". Item is in inventory and stays private until approved.");}catch(err){notice(err.message,true)}finally{saveBtn.disabled=false;saveBtn.textContent="Save item to inventory →"}});
 async function loadOrders(){try{var d=await api("/api/admin/orders"),rows=d.orders||[];$("#orders").textContent=rows.length?rows.map(function(o){return o.id+" · "+o.status+" · "+fmt(o.total)}).join(" | "):"No orders recorded yet. Order checkout is not enabled in this build."}catch(e){$("#orders").textContent="Orders unavailable until order processing is configured."}}
+
+function ebayFormValues(){
+ return {
+  marketplace_id:$("#ebayMarketplace").value,currency:$("#ebayCurrency").value,category_id:$("#ebayCategory").value,
+  merchant_location_key:$("#ebayLocationKey").value,location_name:$("#ebayLocationName").value,address_line1:$("#ebayAddress").value,
+  city:$("#ebayCity").value,state_or_province:$("#ebayState").value,postal_code:$("#ebayPostal").value,country:$("#ebayCountry").value,
+  fulfillment_policy_id:$("#ebayFulfillment").value,payment_policy_id:$("#ebayPayment").value,return_policy_id:$("#ebayReturn").value,
+  listing_duration:$("#ebayDuration").value
+ };
+}
+function hydrateEbaySettings(s){
+ if(!s)return;
+ $("#ebayMarketplace").value=s.marketplace_id||"EBAY_US";$("#ebayCurrency").value=s.currency||"USD";
+ $("#ebayCategory").value=s.category_id||"";$("#ebayLocationKey").value=s.merchant_location_key||"magic-door-books";
+ $("#ebayLocationName").value=s.location_name||"Magic Door Books";$("#ebayAddress").value=s.address_line1||"";
+ $("#ebayCity").value=s.city||"Pomona";$("#ebayState").value=s.state_or_province||"CA";
+ $("#ebayPostal").value=s.postal_code||"";$("#ebayCountry").value=s.country||"US";
+ $("#ebayFulfillment").value=s.fulfillment_policy_id||"";$("#ebayPayment").value=s.payment_policy_id||"";
+ $("#ebayReturn").value=s.return_policy_id||"";$("#ebayDuration").value=s.listing_duration||"GTC";
+}
+function renderEbayConnection(){
+ if(!ebayStatusData)return;
+ var st=ebayStatusData,missing=st.missingSecrets||[],s=st.settings||{};
+ $("#ebayEnvironmentBadge").textContent=(st.connected?"CONNECTED · ":"NOT CONNECTED · ")+(st.environment==="sandbox"?"SANDBOX":"PRODUCTION");
+ $("#ebayEnvironmentBadge").className="pill "+(st.connected?"green":"gold");
+ var state=$("#ebayConnectionState");state.className="ebay-state "+(st.connected?"good":"warn");
+ state.innerHTML='<span class="ebay-dot"></span><span>'+esc(st.connected?"eBay seller account is connected. OneCopy can request a short-lived access token when you publish or update a listing.":"eBay seller account is not connected yet.")+'</span>';
+ $("#ebayCallbackUrl").textContent=st.callbackUrl||"";
+ if(missing.length){
+  $("#ebaySecretsText").textContent="Missing Cloudflare Worker secrets: "+missing.join(", ")+". Add them under Workers & Pages → onecopy-commerce → Settings → Variables and Secrets, then refresh this screen.";
+ }else{
+  $("#ebaySecretsText").textContent="eBay app credentials are present. Use Connect eBay seller account to authorize OneCopy for inventory listing and seller-account policy access.";
+ }
+ var sum=st.summary||{};$("#ebayCountTotal").textContent=Number(sum.total)||0;$("#ebayCountPublished").textContent=Number(sum.published)||0;$("#ebayCountErrors").textContent=Number(sum.errors)||0;
+ var settingsComplete=Boolean(s.category_id&&s.merchant_location_key&&s.fulfillment_policy_id&&s.payment_policy_id&&s.return_policy_id);
+ $("#connectEbay").disabled=!st.configured;
+ $("#disconnectEbay").disabled=!st.connected;
+ $("#createEbayLocation").disabled=!st.connected;
+ $("#loadEbayPolicies").disabled=!st.connected;
+ $("#loadEbayLocations").disabled=!st.connected;
+ renderEbayListings(st.listings||[]);
+ renderEbayInventoryOptions();
+ if(ebayPreviewItem)showEbayPreview(ebayPreviewItem);
+}
+function renderEbayInventoryOptions(){
+ var select=$("#ebayProductSelect"),current=select.value;
+ var eligible=inventoryRows.filter(function(p){return p.review_status==="approved"&&p.zone!=="rear_restricted"&&p.status==="in_stock"&&Number(p.quantity)>0&&Number(p.price)>0;});
+ select.innerHTML='<option value="">Choose an approved item…</option>'+eligible.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.title)+' · '+fmt(p.price)+' · '+esc(p.id)+'</option>'}).join("");
+ if(eligible.some(function(p){return p.id===current}))select.value=current;
+ if(!eligible.length)select.innerHTML='<option value="">No eligible items yet — approve an in-stock item with a price first</option>';
+}
+function showEbayPreview(item){
+ ebayPreviewItem=item||null;
+ var box=$("#ebayPreview");
+ if(!item){box.classList.add("hidden");$("#publishEbayItem").disabled=true;return;}
+ box.classList.remove("hidden");
+ var issues=[];
+ if(String(item.title||"").length>80)issues.push("Title is over eBay's 80-character title limit. Shorten the item title in OneCopy before publishing.");
+ if(!item.image_url)issues.push("No item photo is recorded. eBay categories commonly require a photo; add a clear HTTPS image URL before publishing.");
+ if(item.image_url&&!/^https:\/\//i.test(item.image_url))issues.push("The image URL must use HTTPS.");
+ if(!ebayStatusData||!ebayStatusData.connected)issues.push("Connect an eBay seller account first.");
+ var s=ebayStatusData&&ebayStatusData.settings||{};
+ if(!s.category_id||!s.merchant_location_key||!s.fulfillment_policy_id||!s.payment_policy_id||!s.return_policy_id)issues.push("Complete and save the eBay category, location key, and all three business policy IDs.");
+ box.innerHTML='<div class="kicker">Listing preview · Not published yet</div><h4>'+esc(item.title)+'</h4><div class="preview-meta">SKU: '+esc(item.id)+' · Condition: '+esc(item.condition)+' · Quantity: '+Number(item.quantity||0)+'</div><div class="preview-price">'+fmt(item.price)+'</div><div class="preview-meta">Author/maker: '+esc(item.author||"Not entered")+' · ISBN/barcode: '+esc(item.isbn||"Not entered")+'</div><p>'+esc(item.description||"No customer-facing description entered yet.")+'</p>'+(issues.length?'<div class="preview-warning"><strong>Review before publishing</strong><br>'+issues.map(esc).join("<br>")+'</div>':'<div class="message">The item passes OneCopy checks. Click Publish only when you are ready to create or revise the live eBay listing.</div>');
+ $("#publishEbayItem").disabled=issues.length>0||!item;
+}
+function renderEbayListings(rows){
+ var box=$("#ebayListings");
+ if(!rows.length){box.innerHTML='<div class="sub">No eBay-managed listings yet. Once you publish one from the preview panel, its eBay IDs and status will appear here.</div>';return;}
+ box.innerHTML=rows.map(function(l){
+  var link=l.listing_id?'<a class="textlink" href="'+(ebayStatusData&&ebayStatusData.environment==="sandbox"?"https://sandbox.ebay.com/itm/":"https://www.ebay.com/itm/")+encodeURIComponent(l.listing_id)+'" target="_blank" rel="noopener">Open eBay listing ↗</a>':"";
+  var err=l.last_error?'<small style="color:#9d3b2c">'+esc(l.last_error)+'</small>':"";
+  var action=l.listing_status==="published"?'<button class="btn secondary" data-ebay-withdraw="'+esc(l.product_id)+'">Withdraw listing</button>':"";
+  return '<div class="ebay-listing"><div><strong>'+esc(l.title||l.product_id)+' · '+esc(l.listing_status||"unknown")+'</strong><small>OneCopy SKU '+esc(l.sku)+' · offer '+esc(l.offer_id||"—")+' · listing '+esc(l.listing_id||"—")+'</small><small>'+link+'</small>'+err+'</div><div class="actions">'+action+'</div></div>';
+ }).join("");
+}
+async function loadEbayPanel(){
+ try{
+  const result=await api("/api/admin/ebay/status");
+  ebayStatusData=result;
+  if(!ebaySettingsLoaded){hydrateEbaySettings(result.settings);ebaySettingsLoaded=true;}
+  renderEbayConnection();
+ }catch(e){
+  $("#ebayConnectionState").className="ebay-state warn";
+  $("#ebayConnectionState").innerHTML='<span class="ebay-dot"></span><span>'+esc(e.message)+'</span>';
+  if(e.message.indexOf("sign in")>=0)loginView();
+ }
+}
+function handleEbayReturnMessage(){
+ var params=new URLSearchParams(window.location.search),flag=params.get("ebay");
+ if(flag==="connected"){notice("eBay seller account connected. Configure policies and your ship-from inventory location before listing.");setView("ebay");loadEbayPanel();}
+ else if(flag==="error"){notice("eBay connection issue: "+(params.get("reason")||"Please try connecting again."),true);setView("ebay");loadEbayPanel();}
+}
+function ebayPolicyDatalist(id,rows,idField,nameField){
+ var el=$("#"+id);if(!el)return;el.innerHTML="";
+ (rows||[]).forEach(function(row){var option=document.createElement("option");option.value=row[idField]||"";option.label=(row[nameField]||"eBay policy")+" · "+(row[idField]||"");el.appendChild(option)});
+}
+$("#ebaySettingsForm").addEventListener("submit",async function(e){
+ e.preventDefault();var button=$("#saveEbaySettings");button.disabled=true;button.textContent="Saving settings…";
+ try{const result=await api("/api/admin/ebay/settings",{method:"PUT",body:JSON.stringify(ebayFormValues())});hydrateEbaySettings(result.settings);ebaySettingsLoaded=true;await loadEbayPanel();notice("eBay seller settings saved. Save again after choosing any new policy IDs.");}
+ catch(err){notice(err.message,true)}finally{button.disabled=false;button.textContent="Save eBay settings"}
+});
+$("#connectEbay").addEventListener("click",async function(){
+ try{const result=await api("/api/admin/ebay/connect",{method:"POST",body:"{}"});window.location.href=result.authUrl;}
+ catch(err){notice(err.message,true)}
+});
+$("#disconnectEbay").addEventListener("click",async function(){
+ if(!window.confirm("Disconnect OneCopy from eBay? This removes the saved authorization from OneCopy but does not end existing eBay listings."))return;
+ try{await api("/api/admin/ebay/disconnect",{method:"POST",body:"{}"});await loadEbayPanel();notice("eBay authorization removed from OneCopy. Existing eBay listings have not been ended.");}
+ catch(err){notice(err.message,true)}
+});
+$("#refreshEbay").addEventListener("click",loadEbayPanel);
+$("#copyEbayCallback").addEventListener("click",async function(){
+ try{await navigator.clipboard.writeText($("#ebayCallbackUrl").textContent);notice("eBay callback URL copied.");}
+ catch(e){notice("Select and copy the callback URL shown above.",true)}
+});
+$("#loadEbayPolicies").addEventListener("click",async function(){
+ try{
+  var d=await api("/api/admin/ebay/policies");
+  ebayPolicyDatalist("ebayFulfillmentOptions",d.fulfillment,"fulfillmentPolicyId","name");
+  ebayPolicyDatalist("ebayPaymentOptions",d.payment,"paymentPolicyId","name");
+  ebayPolicyDatalist("ebayReturnOptions",d.returns,"returnPolicyId","name");
+  notice("Loaded "+d.fulfillment.length+" shipping, "+d.payment.length+" payment, and "+d.returns.length+" return policies. Choose a policy ID from each field and save settings.");
+ }catch(e){notice(e.message,true)}
+});
+$("#loadEbayLocations").addEventListener("click",async function(){
+ try{
+  var d=await api("/api/admin/ebay/locations"),list=$("#ebayLocationKeys");list.innerHTML="";
+  (d.locations||[]).forEach(function(loc){var op=document.createElement("option");op.value=loc.merchantLocationKey||"";op.label=loc.name||loc.merchantLocationKey||"";list.appendChild(op)});
+  if(d.locations&&d.locations.length)notice("Loaded "+d.locations.length+" eBay inventory locations. Choose the matching merchant location key and save settings.");
+  else notice("No eBay inventory locations were returned. Enter the ship-from address above, save settings, then register the location.");
+ }catch(e){notice(e.message,true)}
+});
+$("#createEbayLocation").addEventListener("click",async function(){
+ var btn=$("#createEbayLocation");btn.disabled=true;btn.textContent="Registering location…";
+ try{
+  await api("/api/admin/ebay/settings",{method:"PUT",body:JSON.stringify(ebayFormValues())});
+  var d=await api("/api/admin/ebay/location",{method:"POST",body:"{}"});
+  await loadEbayPanel();notice(d.message||"eBay inventory location is ready.");
+ }catch(e){notice(e.message,true)}finally{btn.disabled=false;btn.textContent="Register ship-from location"}
+});
+$("#previewEbayItem").addEventListener("click",function(){
+ var id=$("#ebayProductSelect").value,item=inventoryRows.find(function(p){return p.id===id});
+ if(!item){showEbayPreview(null);notice("Choose an approved, in-stock item to preview.",true);return;}
+ showEbayPreview(item);
+});
+$("#ebayProductSelect").addEventListener("change",function(){ebayPreviewItem=null;showEbayPreview(null)});
+$("#publishEbayItem").addEventListener("click",async function(){
+ var item=ebayPreviewItem;if(!item)return;
+ if(!window.confirm("Publish this item to eBay at "+fmt(item.price)+"? This may create a real public listing."))return;
+ var btn=$("#publishEbayItem");btn.disabled=true;btn.textContent="Publishing to eBay…";
+ try{
+  var result=await api("/api/admin/ebay/products/"+encodeURIComponent(item.id)+"/publish",{method:"POST",body:"{}"});
+  await loadEbayPanel();
+  notice(result.message+" OneCopy ID "+item.id+" · eBay listing "+result.listing_id+".");
+  $("#ebayProductSelect").value=item.id;showEbayPreview(item);
+ }catch(e){notice(e.message,true);await loadEbayPanel();showEbayPreview(item)}
+ finally{btn.textContent="Publish to eBay →";if(ebayPreviewItem)showEbayPreview(ebayPreviewItem)}
+});
+$("#ebayListings").addEventListener("click",async function(e){
+ var btn=e.target.closest("button[data-ebay-withdraw]");if(!btn)return;
+ var id=btn.dataset.ebayWithdraw;
+ if(!window.confirm("Withdraw this listing from eBay? The OneCopy inventory record will remain in stock."))return;
+ btn.disabled=true;btn.textContent="Withdrawing…";
+ try{var result=await api("/api/admin/ebay/products/"+encodeURIComponent(id)+"/withdraw",{method:"POST",body:"{}"});notice(result.message);await loadEbayPanel();}
+ catch(err){notice(err.message,true);btn.disabled=false;btn.textContent="Withdraw listing"}
+});
+
 </script></body></html>
