@@ -16,6 +16,54 @@
 .studio-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin-bottom:16px}.studio-pill{border:1px solid var(--line);border-radius:10px;padding:12px;background:#f8f8f1}.studio-pill strong{display:block;font:17px Georgia,serif;color:#2b4f34}.studio-pill small{font-size:10px;color:var(--muted)}.studio-grid{display:grid;grid-template-columns:minmax(330px,.95fr) minmax(380px,1.05fr);gap:17px;align-items:start}.studio-editor{min-width:0}.studio-preview{position:sticky;top:12px;min-width:0}.studio-box{border:1px solid var(--line);background:#fffef9;border-radius:12px;padding:16px;margin-bottom:13px}.studio-box h3{font:20px Georgia,serif;margin:0 0 4px}.studio-box .explain{font-size:11px;color:var(--muted);line-height:1.6;margin:0 0 13px}.studio-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.studio-field{min-width:0;display:flex;flex-direction:column;gap:5px}.studio-field.full{grid-column:1/-1}.studio-field label{font-size:10px;font-weight:850;letter-spacing:.4px;color:#52604e}.studio-field input:not([type=checkbox]):not([type=color]),.studio-field select,.studio-field textarea{width:100%;padding:9px 10px;border:1px solid #d8ddd1;border-radius:8px;background:white;color:var(--ink);font:12px system-ui;min-width:0}.studio-field textarea{min-height:65px;resize:vertical;line-height:1.5}.studio-field input[type=color]{width:100%;height:38px;border:1px solid #d8ddd1;background:#fff;border-radius:8px;padding:3px;cursor:pointer}.studio-field small{font-size:10px;color:var(--muted);line-height:1.45}.studio-color-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.studio-toggle-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.studio-toggle{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11px;color:#52604e;background:#faf9f2}.studio-toggle input{accent-color:#285c43}.studio-manager{display:grid;grid-template-columns:1fr 1fr;gap:11px}.studio-manager .studio-field:first-child{grid-column:1/-1}.studio-actionbar{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.studio-section-label{font-size:9px;text-transform:uppercase;color:#9b6b2f;letter-spacing:1.4px;font-weight:900;margin:0 0 10px}.studio-preview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px}.studio-preview-head h3{font:21px Georgia,serif;margin:0}.studio-frame-shell{background:#e9ece5;border:1px solid #d9ddd4;border-radius:12px;padding:12px;overflow:hidden}.studio-frame-wrap{height:760px;overflow:hidden;border-radius:8px;background:white;box-shadow:0 6px 22px #1d302315;transition:width .2s;margin:auto;width:100%}.studio-frame-wrap.mobile{width:min(390px,100%);height:720px;border:6px solid #22272b;border-radius:27px}.studio-frame-wrap iframe{width:100%;height:100%;border:0;background:white}.studio-preview-note{font-size:10px;color:var(--muted);line-height:1.6;margin:11px 2px}.studio-swatches{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:10px 0 2px}.studio-swatch{height:28px;border-radius:7px;border:1px solid #00000012}.studio-status{font-size:11px;color:var(--muted);margin-top:8px;min-height:16px}.studio-status.error{color:#9b3e2d}.studio-actions-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.studio-actions-top select,.studio-actions-top input{min-width:160px;flex:1;border:1px solid #d8ddd1;border-radius:8px;padding:9px 10px;background:white;font:12px system-ui}.studio-token-note{font-size:10px;line-height:1.6;color:#6c756a;border-left:3px solid #d6b16e;padding:8px 10px;background:#faf6e9;border-radius:0 7px 7px 0;margin-top:9px}.studio-color-grid .studio-field{background:#faf9f3;border:1px solid var(--line);border-radius:8px;padding:8px}.studio-color-grid .studio-field label{font-size:9px}.studio-label-caption{font-size:9px;font-weight:500;color:#888e82;letter-spacing:0;text-transform:none}.skin-active-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#5b9c5a;margin-right:5px}
 @media(max-width:1150px){.studio-grid{grid-template-columns:1fr}.studio-preview{position:static}.studio-frame-wrap{height:650px}}
 @media(max-width:700px){.studio-fields,.studio-manager{grid-template-columns:1fr}.studio-manager .studio-field:first-child,.studio-field.full{grid-column:auto}.studio-color-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.studio-overview{grid-template-columns:1fr 1fr}.studio-frame-wrap{height:560px}.studio-frame-wrap.mobile{height:620px}}
+
+.capture-config{padding:11px 13px;border-radius:9px;background:#f5f1e4;border:1px solid #eadbbb;color:#72552a;font-size:12px;line-height:1.6;margin:-3px 0 16px}
+.capture-config.good{background:#eaf3e7;border-color:#d5e5cf;color:#285a35}.capture-config.bad{background:#faebe6;border-color:#efcfc5;color:#973e2b}
+.capture-layout{display:grid;grid-template-columns:minmax(0,.97fr) minmax(340px,1.03fr);gap:15px;align-items:start}
+.capture-column{min-width:0}.capture-box{border:1px solid var(--line);background:#fffef9;border-radius:12px;padding:15px;margin-bottom:13px;min-width:0}
+.capture-section-head{display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:13px}.capture-section-head h3{font:20px Georgia,serif;margin:0 0 4px;color:#2c3c2d}.capture-section-head p{font-size:11px;line-height:1.6;color:var(--muted);margin:0}
+.capture-camera{min-height:220px;border-radius:10px;background:#1b2822;overflow:hidden;display:grid;place-items:center;position:relative}
+.capture-camera video{display:block;width:100%;height:auto;max-height:420px;object-fit:contain;background:#101813}
+.capture-placeholder{min-height:220px;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#e9eee5;gap:8px}
+.capture-camera-icon{display:grid;place-items:center;width:52px;height:52px;border:1px solid #718274;border-radius:50%;font-size:29px;color:#e1c38a}
+.capture-placeholder strong{font:19px Georgia,serif}.capture-placeholder span{font-size:11px;line-height:1.6;max-width:320px;color:#bfc9bf}
+.capture-button-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:10px}
+.capture-secondary-row{padding-bottom:12px;border-bottom:1px solid var(--line)}
+.capture-file-label{display:inline-flex;align-items:center}.capture-count{font-size:10px;color:var(--muted);margin-left:auto}
+.capture-image-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.capture-thumb{border:1px solid var(--line);background:#faf9f2;border-radius:8px;padding:6px;min-width:0;overflow:hidden}
+.capture-thumb img{display:block;width:100%;height:110px;object-fit:cover;background:#e4e6dd;border-radius:5px}
+.capture-thumb-label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#48564a;margin:6px 1px}
+.capture-thumb button{width:100%;padding:5px 6px;font-size:10px;border:1px solid #e1d7c4;background:#fffaf0;color:#8c4e35;border-radius:6px}
+.capture-run-status{font-size:11px;line-height:1.5;color:var(--muted);flex:1;min-width:130px}
+.capture-run-status.error{color:#9b3e2d}.capture-run-status.good{color:#2d693e}
+.capture-results-box{position:sticky;top:12px}.capture-idle{min-height:260px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:25px;color:var(--muted)}
+.capture-idle-icon{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:#e8eee4;color:#315d3c;font-size:23px;margin-bottom:12px}
+.capture-idle strong{font:20px Georgia,serif;color:#344337}.capture-idle p{max-width:330px;font-size:11px;line-height:1.7}
+.capture-result-head{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
+.capture-result-head h3{font:26px/1.12 Georgia,serif;margin:0 0 8px;color:#263c2c;overflow-wrap:anywhere}
+.capture-tagrow{display:flex;flex-wrap:wrap;gap:6px}.capture-tag{display:inline-flex;align-items:center;border:1px solid #d9e2d3;background:#edf3e9;padding:4px 7px;border-radius:6px;font-size:10px;color:#34563a}
+.capture-tag.warn{background:#fbf0dd;border-color:#e8d5ad;color:#865f25}.capture-tag.risk{background:#f8e7e1;border-color:#e9c7bb;color:#92412e}
+.capture-meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.capture-meta{border:1px solid var(--line);background:#faf9f3;padding:9px;border-radius:8px;min-width:0}
+.capture-meta small{display:block;font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.capture-meta strong{font-size:12px;line-height:1.5;overflow-wrap:anywhere;font-weight:650}
+.capture-description{font-size:12px;line-height:1.7;color:#435045;white-space:pre-wrap}
+.capture-price-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:12px 0}
+.capture-price{background:#f7f3e8;border:1px solid #e8dfc9;border-radius:8px;padding:10px 8px;min-width:0}
+.capture-price small{font-size:9px;display:block;line-height:1.4;text-transform:uppercase;letter-spacing:.4px;color:#776747}
+.capture-price strong{display:block;font:17px Georgia,serif;color:#344a35;margin-top:4px;overflow-wrap:anywhere}
+.capture-subheading{font-size:10px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#8c6733;margin:17px 0 7px}
+.capture-evidence{border:1px solid var(--line);border-radius:8px;padding:10px;margin:7px 0;background:#fffdf7}
+.capture-evidence-head{display:flex;justify-content:space-between;gap:8px;align-items:start}.capture-evidence a{font-size:12px;font-weight:700;color:#25533b;text-decoration:none;overflow-wrap:anywhere}.capture-evidence a:hover{text-decoration:underline}
+.capture-evidence-price{font-size:12px;font-weight:800;white-space:nowrap;color:#304432}
+.capture-evidence small{display:block;font-size:10px;color:var(--muted);line-height:1.6;margin-top:5px}
+.capture-query-links{display:flex;flex-wrap:wrap;gap:6px}.capture-query-links a{display:inline-flex;border:1px solid #dedfd4;border-radius:6px;padding:6px 8px;font-size:10px;color:#35523a;text-decoration:none;background:#faf9f2}
+.capture-review-box{margin-top:12px;border-left:3px solid #c69a54;background:#faf5e8;padding:10px 12px;color:#72572d;font-size:11px;line-height:1.7}
+.capture-transfer{width:100%;margin:14px 0 5px}
+.capture-disclaimer{font-size:10px;color:var(--muted);line-height:1.7;border-top:1px solid var(--line);padding-top:10px;margin-top:12px}
+@media(max-width:1100px){.capture-layout{grid-template-columns:1fr}.capture-results-box{position:static}}
+@media(max-width:600px){.capture-layout{grid-template-columns:1fr}.capture-image-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.capture-thumb img{height:100px}.capture-price-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.capture-price strong{font-size:14px}.capture-button-row .btn,.capture-file-label{flex:1;justify-content:center}.capture-results-box{padding:12px}}
 </style></head>
 <body>
 <header class="topbar"><div class="brand"><span class="brandmark">✦</span><span><span class="brandtitle">OneCopy</span><span class="brandtag">Magic Door Books · Control room</span></span></div><div class="topright"><span class="online-badge"><i></i> Inventory workspace</span><a href="/">View storefront ↗</a></div></header>
@@ -23,7 +71,7 @@
 <section id="app" class="dashboard hidden">
 <div class="welcome"><div><div class="kicker">Store operations / Magic Door Books</div><h1 id="welcomeTitle">Good to see you.</h1><p>Your shelves, stock and review queue at a glance.</p></div><div class="btnline"><button class="btn gold" data-nav="receive">＋ Receive item</button><button id="logout" class="btn secondary">Sign out</button></div></div>
 <div class="workspace">
-<aside class="sidebar"><div class="side-label">Workspace</div><button class="navbtn active" data-nav="overview"><span class="ico">⌂</span> Overview</button><button class="navbtn" data-nav="receive"><span class="ico">＋</span> Receive item</button><button class="navbtn" data-nav="inventory"><span class="ico">▤</span> Inventory</button><button class="navbtn" data-nav="warehouse"><span class="ico">⌖</span> Store zones</button><button class="navbtn" data-nav="design"><span class="ico">✦</span> Website design</button><button class="navbtn" data-nav="ebay"><span class="ico">↗</span> eBay Marketplace</button><button class="navbtn" data-nav="orders"><span class="ico">◇</span> Orders</button><div class="side-note"><strong>Protect the rare finds.</strong>Special, unpriced and uncertain books stay in the Rear until a partner reviews them.</div></aside>
+<aside class="sidebar"><div class="side-label">Workspace</div><button class="navbtn active" data-nav="overview"><span class="ico">⌂</span> Overview</button><button class="navbtn" data-nav="receive"><span class="ico">＋</span> Receive item</button><button class="navbtn" data-nav="capture"><span class="ico">◎</span> AI item capture</button><button class="navbtn" data-nav="inventory"><span class="ico">▤</span> Inventory</button><button class="navbtn" data-nav="warehouse"><span class="ico">⌖</span> Store zones</button><button class="navbtn" data-nav="design"><span class="ico">✦</span> Website design</button><button class="navbtn" data-nav="ebay"><span class="ico">↗</span> eBay Marketplace</button><button class="navbtn" data-nav="orders"><span class="ico">◇</span> Orders</button><div class="side-note"><strong>Protect the rare finds.</strong>Special, unpriced and uncertain books stay in the Rear until a partner reviews them.</div></aside>
 <div class="maincol">
 <div id="globalNotice" class="message hidden" role="status" aria-live="polite"></div>
 <section id="overviewPanel" data-panel="overview">
@@ -35,14 +83,46 @@
 <section id="receivePanel" data-panel="receive" class="hidden"><section class="panel"><div class="panel-head"><div><div class="kicker">Receiving station</div><h2>Receive a new item</h2><p class="explain">Catalog it once, assign its destination and keep it private until reviewed.</p></div><span class="pill gold">NEW RECORD</span></div>
 <form id="itemForm"><div class="formgrid">
 <div class="field"><label for="title">TITLE / ITEM NAME *</label><input id="title" required maxlength="300" placeholder="Book title or product name"></div><div class="field"><label for="author">AUTHOR / MAKER</label><input id="author" maxlength="300" placeholder="Author, artist or brand"></div>
-<div class="field"><label for="isbn">ISBN / UPC / BARCODE</label><input id="isbn" maxlength="40" placeholder="Scan or enter code"></div><div class="field"><label for="category">DEPARTMENT</label><select id="category"><option>Book</option><option>Gift</option><option>Snack</option><option>Beverage</option><option>Coffee</option><option>Game</option><option>Stationery</option><option>Other</option></select></div>
+<div class="field"><label for="isbn">ISBN / UPC / BARCODE</label><input id="isbn" maxlength="40" placeholder="Scan or enter code"></div><div class="field"><label for="category">DEPARTMENT</label><select id="category"><option>Book</option><option>Clothing</option><option>Jewelry</option><option>Antique / Collectible</option><option>Home decor</option><option>Gift</option><option>Snack</option><option>Beverage</option><option>Coffee</option><option>Game</option><option>Stationery</option><option>Other</option></select></div>
 <div class="field"><label for="price">ASKING PRICE (USD)</label><input id="price" type="number" min="0" step=".01" value="0"><span class="fieldnote">The actual price you intend to charge. MSRP is a reference anchor—not a market appraisal.</span></div><div class="field"><label for="msrp">MSRP / COVER PRICE (USD)</label><input id="msrp" type="number" min="0" step=".01" value="0"><button class="btn secondary price-action" id="useMsrp" type="button">Use MSRP as asking price</button><span class="fieldnote">For eligible as-new, ordinary modern books, MSRP is the default starting point.</span></div>
-<div class="field"><label for="cost">ACQUISITION COST (USD)</label><input id="cost" type="number" min="0" step=".01" value="0"></div><div class="field"><label for="condition">CONDITION</label><select id="condition"><option>As New</option><option>Very Good</option><option selected>Good</option><option>Acceptable</option><option>Fair</option><option>Not Applicable</option></select></div><div class="flagrow"><label><input id="signed" type="checkbox"> Signed / inscribed</label><label><input id="firstEdition" type="checkbox"> First edition / printing</label><label><input id="special" type="checkbox"> Special / unusual copy</label><span class="fieldnote">Any checked flag means: pause ordinary MSRP pricing and request partner review.</span></div>
+<div class="field"><label for="cost">ACQUISITION COST (USD)</label><input id="cost" type="number" min="0" step=".01" value="0"></div><div class="field"><label for="condition">CONDITION</label><select id="condition"><option>As New</option><option>Very Good</option><option selected>Good</option><option>Acceptable</option><option>Fair</option><option>Unknown — assess manually</option><option>Not Applicable</option></select></div><div class="flagrow"><label><input id="signed" type="checkbox"> Signed / inscribed</label><label><input id="firstEdition" type="checkbox"> First edition / printing</label><label><input id="special" type="checkbox"> Special / unusual copy</label><span class="fieldnote">Any checked flag means: pause ordinary MSRP pricing and request partner review.</span></div>
 <div class="field"><label for="zone">WAREHOUSE ZONE</label><select id="zone"><option value="middle_retail">Middle — Standard retail</option><option value="front_special">Front — Special display</option><option value="annex_retail">Annex — Coffee, snacks & gifts</option><option value="rear_restricted">Rear — Restricted review</option></select></div><div class="field"><label for="location">SHELF / BIN LOCATION</label><input id="location" placeholder="e.g. M-03, Annex-Gift-1"></div>
 <div class="field"><label for="quantity">QUANTITY ON HAND</label><input id="quantity" type="number" min="0" max="100000" value="1"></div><div class="field"><label for="stockMode">STOCK TYPE</label><select id="stockMode"><option value="unique">Unique copy / one-off</option><option value="quantity">Quantity-tracked merchandise</option></select></div>
 <div class="field"><label for="cpv">CPV · COMPARABLE PRICE VALUE (USD)</label><input id="cpv" type="number" min="0" step=".01" value="0"><span class="fieldnote">Evidence-based market reference. Prefer completed sales of genuinely similar copies.</span></div><div class="field"><label for="tpv">TPV · TARGET PRICE VALUE (USD)</label><input id="tpv" type="number" min="0" step=".01" value="0"><span class="fieldnote">Your proposed target asking price after condition, scarcity, demand, costs and selling fees are considered.</span></div><div class="field"><label for="valuationBasis">VALUATION EVIDENCE</label><select id="valuationBasis"><option value="none">Not researched yet</option><option value="sold_comps">Recent completed sales</option><option value="catalog">Catalog / published price guide</option><option value="internal_sales">Our own sales history</option><option value="appraisal">Professional appraisal</option><option value="partner_judgment">Partner judgment</option></select></div><div class="field"><label for="valuationConfidence">EVIDENCE CONFIDENCE</label><select id="valuationConfidence"><option value="low">Low — thin or uncertain evidence</option><option value="medium">Medium — some comparable evidence</option><option value="high">High — strong, close matches</option></select></div><div class="field wide"><label for="marketComps">COMPARABLE SALES / SOURCES</label><textarea id="marketComps" placeholder="Sale price, sold date, edition/condition match, source links, fees/shipping considerations…"></textarea><span class="fieldnote">Record the evidence so another staff member can understand and reproduce the decision.</span></div>
 <div class="field wide"><label for="image">IMAGE URL (OPTIONAL)</label><input id="image" type="url" placeholder="https://…"></div><div class="field wide"><label for="description">DESCRIPTION</label><textarea id="description" placeholder="Edition, notable details, description for customers…"></textarea></div><div class="field wide"><label for="notes">STAFF / PARTNER NOTES</label><textarea id="notes" placeholder="Internal notes; keep special details here for review."></textarea></div>
 </div><div class="btnline"><button class="btn" id="saveItemButton" type="submit">Save item to inventory →</button><button class="btn secondary" type="button" id="resetForm">Clear form</button></div></form><section class="valuation-guide"><h3>OneCopy pricing philosophy</h3><p>Use a consistent rule for routine stock, then reserve human judgment for exceptions. The fields below record distinct kinds of evidence; they are not all interchangeable price tags.</p><div class="guidegrid"><article class="guidecard"><strong>MSRP — the routine baseline</strong><p>For an ordinary, modern, mass-produced book in <em>As New</em> condition, start at the verified cover price. Do not use MSRP blindly for used, old, scarce, signed, first-edition or unusual copies. Never invent a cover price when it is unknown.</p></article><article class="guidecard"><strong>CPV — market evidence</strong><p>Comparable Price Value is a reference drawn from genuinely similar items. Prefer completed/sold transactions over unsold asking prices. Match edition, format and condition, and consider date, shipping and selling channel.</p></article><article class="guidecard"><strong>TPV — target strategy</strong><p>Target Price Value is OneCopy’s working target asking price: market evidence considered alongside condition, rarity, demand, how quickly the item should sell, acquisition cost and channel fees. This field is a human-entered estimate in this version, not an automatic appraisal.</p></article><article class="guidecard"><strong>Confidence — how strong is the evidence?</strong><p>Confidence describes the evidence, not how much we like the price. Use Low for sparse/weak matches, Medium for some comparable support, and High for several recent, close matches. Keep source notes so estimates can be audited.</p></article></div><p style="margin-top:12px"><strong>Moneyball rule:</strong> separate observable facts from assumptions. Track sold price, sell-through, time-to-sale, discount and net proceeds over time; don’t treat a high asking price as proof that an item is worth that amount.</p></section><div id="notice" class="message hidden"></div><div class="section-footer">New items start unpublished. Rear-zone items remain restricted until a partner reviews them.</div></section></section>
+<section id="capturePanel" data-panel="capture" class="hidden">
+ <section class="panel">
+  <div class="panel-head"><div><div class="kicker">Camera intake · assisted cataloging</div><h2>AI Item Capture</h2><p class="explain">Photograph the item, label, copyright page, hallmark or maker's mark. OneCopy will identify what it can, look for reference listings, and prepare a draft for your review.</p></div><span class="pill gold">REVIEW BEFORE SAVE</span></div>
+  <div id="captureConfigNotice" class="capture-config"></div>
+  <div class="capture-layout">
+   <div class="capture-column">
+    <div class="capture-box">
+     <div class="capture-section-head"><div><h3>1. Photograph the item</h3><p>Use several angles for old books, clothing labels, jewelry marks or antiques. Up to five images per analysis.</p></div></div>
+     <div class="capture-camera"><video id="captureVideo" autoplay playsinline muted hidden></video><div id="captureCameraPlaceholder" class="capture-placeholder"><div class="capture-camera-icon">◎</div><strong>Camera ready when you are</strong><span>Start the camera, then capture a photo. The browser may ask you to allow camera access.</span></div></div>
+     <div class="capture-button-row"><button class="btn" id="captureStartCamera" type="button">Start phone camera</button><button class="btn secondary" id="captureTakePhoto" type="button" disabled>Capture photo</button><button class="btn secondary" id="captureStopCamera" type="button" disabled>Stop camera</button></div>
+     <div class="capture-button-row capture-secondary-row"><label class="btn secondary capture-file-label" for="captureFileInput">Choose photos / use camera</label><input id="captureFileInput" type="file" accept="image/*" capture="environment" multiple hidden><button class="btn secondary" id="captureClearPhotos" type="button">Clear photos</button><span id="captureImageCount" class="capture-count">0 of 5 photos</span></div>
+     <div id="captureImageGrid" class="capture-image-grid"></div>
+     <p class="fieldnote">Tip: for an old book, photograph the cover, title page and the copyright/publisher page. For jewelry, include hallmarks and clasp; for clothing, include the brand and care/size tags. Photos are sent to the configured AI provider for analysis. This first version does not permanently store the original photo in inventory.</p>
+    </div>
+    <div class="capture-box">
+     <div class="capture-section-head"><div><h3>2. Add context</h3><p>Optional information can help disambiguate similar editions and makers.</p></div></div>
+     <div class="field"><label for="captureType">ITEM TYPE</label><select id="captureType"><option>Auto</option><option>Book</option><option>Clothing</option><option>Jewelry</option><option>Antique / Collectible</option><option>Home decor</option><option>Game</option><option>Gift</option><option>Stationery</option><option>Other</option></select></div>
+     <div class="field"><label for="captureNotes">STAFF OBSERVATIONS (OPTIONAL)</label><textarea id="captureNotes" rows="3" placeholder="e.g. Found in the rear collection; cloth cover; 1940s according to donor; faint 14K stamp on clasp. Do not guess if unsure."></textarea></div>
+     <div class="capture-button-row"><button class="btn gold" id="captureAnalyze" type="button">Identify item & research matches →</button><span id="captureRunStatus" class="capture-run-status" role="status" aria-live="polite"></span></div>
+    </div>
+   </div>
+   <div class="capture-box capture-results-box">
+    <div class="capture-section-head"><div><h3>3. Identification & value evidence</h3><p>The AI's findings are suggestions to review—not an authentication, appraisal or automatic price decision.</p></div></div>
+    <div id="captureIdle" class="capture-idle"><div class="capture-idle-icon">✦</div><strong>Ready to examine an item</strong><p>Add clear photos and run the analysis. The result will separate visible facts, comparable listings and uncertainty.</p></div>
+    <div id="captureResultBody" hidden></div>
+    <button id="captureTransfer" class="btn capture-transfer" type="button" hidden>Review in Receive Item form →</button>
+    <p class="fieldnote">Nothing is saved automatically. Transfer the draft into Receive Item, confirm the identifying details and condition, verify price evidence, then save. New records remain unpublished until separately approved.</p>
+   </div>
+  </div>
+ </section>
+</section>
+
 <section id="inventoryPanel" data-panel="inventory" class="hidden"><section class="panel"><div class="panel-head"><div><div class="kicker">Master records</div><h2>Inventory & review queue</h2><p class="explain">Search every record and check where it belongs.</p></div><div class="btnline"><button class="btn secondary" id="exportCsv" type="button">Export inventory CSV</button><button class="btn gold" data-nav="receive">＋ Add item</button></div></div><div class="tabletools"><input id="inventorySearch" type="search" placeholder="Search title, author, ISBN or ID…"><select id="inventoryZone"><option value="">All warehouse zones</option><option value="front_special">Front display</option><option value="middle_retail">Middle retail</option><option value="annex_retail">Annex retail</option><option value="rear_restricted">Rear restricted</option></select><select id="inventoryReview"><option value="">All review states</option><option value="needs_partner_review">Needs partner review</option><option value="approved">Approved</option><option value="flagged">Flagged</option></select></div><div class="tablewrap"><table><thead><tr><th>Item</th><th>Price</th><th>Zone / location</th><th>Review / status</th><th>Actions</th></tr></thead><tbody id="products"><tr><td colspan="5" class="emptyrow">Loading inventory…</td></tr></tbody></table></div><div id="inventoryFooter" class="section-footer"></div></section></section>
 <section id="warehousePanel" data-panel="warehouse" class="hidden"><section class="panel"><div class="panel-head"><div><div class="kicker">Physical map</div><h2>Four zones. One system.</h2><p class="explain">The physical destination and online approval status are separate fields.</p></div><span class="pill">WAREHOUSE GUIDE</span></div><div class="zonegrid"><article class="zonecard front"><span class="zoneletter">F</span><div class="zonetag">01 · Near entrance</div><h3>Front display</h3><p>Signed copies, first editions, rare finds and special items chosen for prominent display. Premium pricing requires partner judgment.</p><span class="pill gold">Special / premium</span></article><article class="zonecard middle"><span class="zoneletter">M</span><div class="zonetag">02 · Retail floor</div><h3>Middle retail</h3><p>Routine modern, mass-produced books after the initial exception screen. Verified MSRP can be the baseline; discounts are intentional decisions.</p><span class="pill green">Junior staff allowed</span></article><article class="zonecard annex"><span class="zoneletter">A</span><div class="zonetag">03 · Separate department</div><h3>Annex retail</h3><p>Coffee, snacks, beverages, gifts, stationery and other merchandise. Use quantity tracking and supplier / reorder details as those fields are added.</p><span class="pill">Merchandise</span></article><article class="zonecard rear"><span class="zoneletter">R</span><div class="zonetag">04 · Behind the desk</div><h3>Restricted backroom</h3><p>Old, antique, special, unpriced, hard-to-value or backlog books. No public display or junior-staff discount without partner approval.</p><span class="pill red">Partner review only</span></article></div><div class="rulelist"><div class="rule"><i>✓</i><span><strong>Modern is not automatically ordinary.</strong> Signed, first-edition or otherwise special books must be flagged and reviewed even if they have a barcode.</span></div><div class="rule"><i>✓</i><span><strong>Zone and channel are different.</strong> A book can be on the Front shelf but still unpublished online until a partner approves its listing.</span></div><div class="rule"><i>✓</i><span><strong>Every copy has its own identity.</strong> Keep condition, price and location at the individual-copy level for unique stock.</span></div></div></section></section>
 
@@ -217,7 +297,150 @@ function notice(t,err){var target=$("#globalNotice")||$("#notice");msg(target,t,
 async function api(path,opts){opts=opts||{};opts.credentials="same-origin";opts.headers=Object.assign({"content-type":"application/json"},opts.headers||{});var r=await fetch(path,opts),d=await r.json().catch(function(){return {error:"Unexpected server response"}});if(!r.ok)throw Error(d.error||("HTTP "+r.status));return d}
 function loginView(){$("#login").classList.remove("hidden");$("#app").classList.add("hidden")}
 async function appView(){$("#login").classList.add("hidden");$("#app").classList.remove("hidden");setView("overview");await Promise.all([loadProducts(),loadOrders(),loadThemeLibrary()]);await loadEbayPanel();handleEbayReturnMessage()}
-function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#title").focus()},60);if(name==="ebay")setTimeout(function(){loadEbayPanel()},30);if(name==="design")setTimeout(function(){if(!themeLibraryLoaded)loadThemeLibrary();else sendThemePreview()},30)}
+
+var captureImages=[],captureStream=null,captureResult=null,captureStatusLoaded=false;
+function setCaptureStatus(text,tone){var el=$("#captureRunStatus");el.textContent=text||"";el.className="capture-run-status"+(tone?" "+tone:"")}
+function captureFileToDataUrl(file){
+ return new Promise(function(resolve,reject){
+  var reader=new FileReader();
+  reader.onerror=function(){reject(Error("Could not read that photo."))};
+  reader.onload=function(){
+   var img=new Image();
+   img.onerror=function(){reject(Error("That image could not be decoded."))};
+   img.onload=function(){
+    var max=1600,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+    var canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    var ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    try{resolve(canvas.toDataURL("image/jpeg",.82))}catch(e){reject(e)}
+   };
+   img.src=String(reader.result);
+  };
+  reader.readAsDataURL(file);
+ });
+}
+function renderCaptureImages(){
+ $("#captureImageCount").textContent=captureImages.length+" of 5 photos";
+ $("#captureImageGrid").innerHTML=captureImages.map(function(im,i){return '<div class="capture-thumb"><img src="'+im.dataUrl+'" alt="'+esc(im.label)+'"><span class="capture-thumb-label">'+esc(im.label)+'</span><button type="button" data-remove-capture="'+i+'">Remove photo</button></div>'}).join("");
+ $("#captureTakePhoto").disabled=!captureStream||captureImages.length>=5;
+ $("#captureClearPhotos").disabled=!captureImages.length;
+ $("#captureAnalyze").disabled=!captureImages.length;
+}
+async function loadCaptureStatus(){
+ try{
+  var d=await api("/api/admin/item-capture/status");
+  var el=$("#captureConfigNotice");
+  if(d.configured){el.className="capture-config good";el.textContent="AI capture is configured ("+esc(d.model)+"). Analysis can search for visible reference listings; every identification and price still needs human verification."}
+  else{el.className="capture-config bad";el.textContent="Setup needed: add OPENAI_API_KEY as a Worker secret in Cloudflare to enable AI image analysis. This is an API key with separate usage billing; your ChatGPT subscription is not an API key. Photos stay in the browser except when sent securely for analysis."}
+  captureStatusLoaded=true;
+ }catch(e){$("#captureConfigNotice").className="capture-config";$("#captureConfigNotice").textContent="Could not check AI configuration. Sign in again, then reopen AI Item Capture."}
+}
+async function startCaptureCamera(){
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){setCaptureStatus("Camera access requires a supported browser and a secure HTTPS page. You can use Choose photos instead.","error");return}
+ try{
+  captureStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1440}},audio:false});
+  $("#captureVideo").srcObject=captureStream;$("#captureVideo").hidden=false;$("#captureCameraPlaceholder").hidden=true;
+  $("#captureStopCamera").disabled=false;$("#captureTakePhoto").disabled=captureImages.length>=5;
+  setCaptureStatus("Camera on. Frame the item, avoid glare, then capture a still photo.","good");
+ }catch(e){setCaptureStatus("Camera was unavailable or permission was denied. Allow camera access or choose photos from the device.","error")}
+}
+function stopCaptureCamera(){
+ if(captureStream){captureStream.getTracks().forEach(function(t){t.stop()});captureStream=null}
+ $("#captureVideo").srcObject=null;$("#captureVideo").hidden=true;$("#captureCameraPlaceholder").hidden=false;
+ $("#captureStopCamera").disabled=true;$("#captureTakePhoto").disabled=true;
+}
+function takeCapturePhoto(){
+ var video=$("#captureVideo");if(!captureStream||!video.videoWidth){setCaptureStatus("Wait until the camera picture appears, then capture again.","error");return}
+ if(captureImages.length>=5){setCaptureStatus("Maximum five photos per analysis. Remove a photo to replace it.","error");return}
+ var scale=Math.min(1,1600/Math.max(video.videoWidth,video.videoHeight));
+ var canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(video.videoWidth*scale));canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
+ canvas.getContext("2d").drawImage(video,0,0,canvas.width,canvas.height);
+ captureImages.push({dataUrl:canvas.toDataURL("image/jpeg",.82),label:"Camera photo "+(captureImages.length+1)});
+ renderCaptureImages();setCaptureStatus("Photo captured. Add another angle or run the analysis.","good");
+}
+function captureMoney(value){return value===null||value===undefined||value===""||!Number.isFinite(Number(value))?"Not estimated":fmt(value)}
+function renderCaptureResult(r){
+ var el=$("#captureResultBody");$("#captureIdle").hidden=true;el.hidden=false;
+ var type=esc(r.itemType||"Item"),title=esc(r.title||"Unidentified item");
+ var confidence=String(r.confidence||"low").toLowerCase(),tags='<span class="capture-tag">'+type+'</span><span class="capture-tag '+(confidence==="high"?"":"warn")+'">Confidence: '+esc(confidence)+'</span>';
+ if(r.needsReview)tags+='<span class="capture-tag risk">Human review recommended</span>';
+ var metadata=[["Creator / author",r.creator],["Brand",r.brand],["Manufacturer / maker",r.manufacturer],["Publisher",r.publisher],["Publication year",r.publicationYear],["Edition / model",r.edition||r.model],["ISBN / identifier",r.identifier],["Materials",r.materials],["Condition assessment",r.conditionAssessment],["Condition notes",r.conditionNotes]];
+ var metaHtml=metadata.filter(function(x){return String(x[1]||"").trim()!==""}).map(function(x){return '<div class="capture-meta"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong></div>'}).join("");
+ var prices='<div class="capture-price-grid"><div class="capture-price"><small>Estimated low</small><strong>'+captureMoney(r.estimatedLow)+'</strong></div><div class="capture-price"><small>Estimated high</small><strong>'+captureMoney(r.estimatedHigh)+'</strong></div><div class="capture-price"><small>Suggested ask</small><strong>'+captureMoney(r.suggestedPrice)+'</strong></div></div>';
+ var evid=(r.marketEvidence||[]).filter(function(x){return x&&x.title}).map(function(x){
+  var label=({active_listing:"Active asking price",sold_record:"Sold / completed",catalog_reference:"Catalog / reference",unknown:"Status unclear"})[x.status]||"Status unverified";
+  var link=x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">'+esc(x.title)+'</a>':'<strong>'+esc(x.title)+'</strong>';
+  return '<article class="capture-evidence"><div class="capture-evidence-head"><div>'+link+'<small>'+esc(label)+' · '+esc(x.seller||"Seller/source not identified")+(x.date?" · "+esc(x.date):"")+'</small></div><div class="capture-evidence-price">'+(x.price===null||x.price===undefined?"":esc(x.currency||"USD")+" "+fmt(x.price))+'</div></div><small>Condition: '+esc(x.condition||"Not stated")+'. '+esc(x.comparability||"Similarity not assessed.")+'</small></article>';
+ }).join("");
+ var qs=(r.searchQueries||[]).map(function(q){return '<a href="https://www.google.com/search?q='+encodeURIComponent(q)+'" target="_blank" rel="noopener noreferrer">'+esc(q)+'</a>'}).join("");
+ var reasons=(r.reviewReasons||[]).length?'<div class="capture-review-box"><strong>Review flags</strong><br>'+r.reviewReasons.map(esc).join("<br>")+'</div>':"";
+ el.innerHTML='<div class="capture-result-head"><h3>'+title+'</h3><div class="capture-tagrow">'+tags+'</div></div>'+
+  '<div class="capture-meta-grid">'+metaHtml+'</div>'+
+  '<p class="capture-description">'+esc(r.description||"No reliable description generated.")+'</p>'+
+  prices+'<div class="capture-review-box"><strong>Valuation basis: '+esc(r.valuationBasis||"none")+'</strong><br>'+esc(r.valuationNotes||"No pricing rationale supplied.")+'</div>'+
+  (evid?'<div class="capture-subheading">Market / catalog evidence</div>'+evid:'<div class="capture-subheading">Market evidence</div><p class="capture-description">No comparable source was returned. Do not infer current value from visual similarity alone. Use the search suggestions below or set price manually.</p>')+
+  (qs?'<div class="capture-subheading">Follow-up searches</div><div class="capture-query-links">'+qs+'</div>':"")+
+  reasons+'<div class="capture-disclaimer">These findings can be wrong or incomplete. Current asking prices are not realized sales. Precious metals, gemstones, signatures, provenance and antique editions may need specialist authentication. Confirm facts before listing.</div>';
+ $("#captureTransfer").hidden=false;
+}
+$("#captureStartCamera").addEventListener("click",startCaptureCamera);
+$("#captureTakePhoto").addEventListener("click",takeCapturePhoto);
+$("#captureStopCamera").addEventListener("click",stopCaptureCamera);
+$("#captureFileInput").addEventListener("change",async function(e){
+ var files=Array.from(e.target.files||[]);e.target.value="";
+ if(!files.length)return;
+ for(var i=0;i<files.length&&captureImages.length<5;i++){
+  try{var dataUrl=await captureFileToDataUrl(files[i]);captureImages.push({dataUrl:dataUrl,label:files[i].name||("Photo "+(captureImages.length+1))})}
+  catch(err){setCaptureStatus(err.message||"Could not open a selected photo.","error")}
+ }
+ if(files.length+captureImages.length>5)setCaptureStatus("Only five photos can be analyzed at once. Extra photos were skipped.","error");
+ renderCaptureImages();
+});
+$("#captureClearPhotos").addEventListener("click",function(){captureImages=[];renderCaptureImages();setCaptureStatus("Photos cleared.");});
+$("#captureImageGrid").addEventListener("click",function(e){
+ var button=e.target.closest("[data-remove-capture]");if(!button)return;
+ captureImages.splice(Number(button.dataset.removeCapture),1);renderCaptureImages();setCaptureStatus("Photo removed.");
+});
+$("#captureAnalyze").addEventListener("click",async function(){
+ if(!captureImages.length){setCaptureStatus("Add at least one photo first.","error");return}
+ var button=$("#captureAnalyze");button.disabled=true;button.textContent="Analyzing photos and sources…";setCaptureStatus("Reading visible labels and checking reference sources. This can take a little while.");
+ $("#captureIdle").hidden=false;$("#captureIdle").querySelector("strong").textContent="Analyzing the item…";$("#captureIdle").querySelector("p").textContent="Checking the photos and searching for reference listings. You can review the result before anything is saved.";
+ $("#captureResultBody").hidden=true;$("#captureTransfer").hidden=true;
+ try{
+  var d=await api("/api/admin/item-capture/analyze",{method:"POST",body:JSON.stringify({images:captureImages.map(function(x){return {dataUrl:x.dataUrl,label:x.label}}),itemType:$("#captureType").value,notes:$("#captureNotes").value})});
+  captureResult=d.result;renderCaptureResult(captureResult);setCaptureStatus((d.webResearchUsed?"AI analysis complete; web research was used.":"AI analysis complete. Check the evidence links and uncertainty notes.")+" "+d.disclaimer,"good");
+ }catch(e){$("#captureIdle").hidden=false;$("#captureIdle").querySelector("strong").textContent="Analysis couldn't complete";$("#captureIdle").querySelector("p").textContent=e.message||"Check setup and try again.";setCaptureStatus(e.message||"Analysis failed.","error")}
+ finally{button.disabled=captureImages.length===0;button.textContent="Identify item & research matches →"}
+});
+$("#captureTransfer").addEventListener("click",function(){
+ var r=captureResult;if(!r)return;
+ var type=r.itemType||"Other";
+ var map={"Book":"Book","Clothing":"Clothing","Jewelry":"Jewelry","Antique / Collectible":"Antique / Collectible","Home decor":"Home decor","Game":"Game","Gift":"Gift","Stationery":"Stationery","Other":"Other"};
+ $("#title").value=r.title||"Unidentified item — review needed";
+ $("#author").value=r.creator||r.brand||r.manufacturer||"";
+ $("#isbn").value=r.identifier||"";
+ $("#category").value=map[type]||"Other";
+ $("#condition").value=["As New","Very Good","Good","Acceptable","Fair","Not Applicable"].includes(r.conditionAssessment)?r.conditionAssessment:"Unknown — assess manually";
+ $("#price").value=r.suggestedPrice===null||r.suggestedPrice===undefined?"0":String(r.suggestedPrice);
+ $("#tpv").value=r.suggestedPrice===null||r.suggestedPrice===undefined?"0":String(r.suggestedPrice);
+ var sold=(r.marketEvidence||[]).filter(function(x){return x.status==="sold_record"&&x.price!==null&&Number.isFinite(Number(x.price))}).map(function(x){return Number(x.price)}).sort(function(a,b){return a-b});
+ $("#cpv").value=sold.length?String(Math.round(sold[Math.floor(sold.length/2)]*100)/100):"0";
+ $("#valuationBasis").value=sold.length?"sold_comps":(r.valuationBasis==="catalog"?"catalog":"none");
+ $("#valuationConfidence").value=r.confidence||"low";
+ $("#marketComps").value=(r.marketEvidence||[]).map(function(x){return "["+x.status+"] "+(x.title||"Untitled")+" · "+(x.seller||"source unknown")+" · "+(x.price===null||x.price===undefined?"price not available":(x.currency||"USD")+" "+x.price)+(x.date?" · "+x.date:"")+"\n"+(x.condition||"Condition not stated")+"\n"+(x.url||"No source URL")+"\n"+(x.comparability||"Similarity not assessed")}).join("\n\n");
+ var details=[["Brand",r.brand],["Manufacturer/maker",r.manufacturer],["Publisher",r.publisher],["Publication year",r.publicationYear],["Edition",r.edition],["Model",r.model],["Materials",r.materials],["Condition notes",r.conditionNotes],["Visible features",(r.features||[]).join("; ")]].filter(function(x){return String(x[1]||"").trim()!==""}).map(function(x){return x[0]+": "+x[1]});
+ $("#description").value=[r.description||"",details.length?"AI identification details (verify):\n"+details.join("\n"):""].filter(Boolean).join("\n\n");
+ $("#notes").value=["AI-assisted identification — verify every claim before pricing or listing.",r.valuationNotes||"",r.needsReview?"Human review requested: "+(r.reviewReasons||[]).join("; "):"", "AI confidence: "+(r.confidence||"low")].filter(Boolean).join("\n\n");
+ var vintageYear=parseInt(String(r.publicationYear||"").slice(0,4),10);
+ var needsHuman=Boolean(r.needsReview)||type==="Jewelry"||type==="Antique / Collectible"||(type==="Book"&&Number.isFinite(vintageYear)&&vintageYear<1950);
+ $("#zone").value=needsHuman?"rear_restricted":(type==="Clothing"||type==="Jewelry"||type==="Home decor"||type==="Gift"?"annex_retail":"middle_retail");
+ $("#special").checked=needsHuman;
+ $("#signed").checked=false;
+ $("#firstEdition").checked=/first edition|first printing/i.test(String(r.edition||""));
+ setView("receive");
+ notice("AI draft transferred to Receive Item. Confirm the title/edition, condition and price evidence; photos are not yet stored with the record. Save when reviewed.");
+});
+
+function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#title").focus()},60);if(name==="capture")setTimeout(function(){loadCaptureStatus()},30);if(name==="ebay")setTimeout(function(){loadEbayPanel()},30);if(name==="design")setTimeout(function(){if(!themeLibraryLoaded)loadThemeLibrary();else sendThemePreview()},30)}
 document.querySelectorAll("[data-nav]").forEach(function(b){b.addEventListener("click",function(){setView(b.dataset.nav)})});
 $("#loginForm").addEventListener("submit",async function(e){e.preventDefault();try{await api("/api/admin/login",{method:"POST",body:JSON.stringify({password:$("#password").value})});$("#password").value="";await appView()}catch(err){msg($("#loginMsg"),err.message,true)}});
 $("#logout").addEventListener("click",async function(){try{await api("/api/admin/logout",{method:"POST",body:"{}"})}catch(e){}loginView()});
