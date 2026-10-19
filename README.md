@@ -12,6 +12,27 @@ OneCopy is a simple inventory-backed catalog for Magic Door Books, with the phys
 - **Starts with an empty inventory.** No local catalog import and no demo inventory are required.
 - **Online card checkout and Square are not implemented in this repository yet.** The storefront is currently a catalog preview, not a live store taking payments.
 
+## AI Item Capture (0.10.0)
+
+The Admin Control Room now has an **AI Item Capture** workspace at `/admin`. It supports a live phone/desktop camera preview, still-photo capture, or image selection; up to five images per analysis; and a reviewable catalog draft for books, clothing, jewelry, antiques/collectibles, home decor, and other stock.
+
+The analysis endpoint (`POST /api/admin/item-capture/analyze`) is protected by the existing admin session. It sends compressed photos to the OpenAI Responses API, asks the model to extract visible maker/publisher/edition/identifier/condition information, and enables web search for reference listings when supported by the configured model/account. Returned source links, active asking prices, sold-record indicators, uncertainty, and price suggestions are shown separately. An active listing is not a completed sale, and visual identification is not authentication or a formal appraisal.
+
+### Configure the AI service
+
+1. Create an OpenAI API key for an API project with access to a vision-capable Responses model and web search. **ChatGPT subscriptions and API usage billing are separate.** Review the provider's current model, search, and pricing availability before enabling the feature.
+2. In Cloudflare, open the OneCopy Worker → **Settings → Variables and Secrets** and add `OPENAI_API_KEY` as a secret. Optionally add `OPENAI_MODEL` as a text variable; the default is `gpt-4.1-mini`.
+3. Deploy version 0.10.0, sign in to `/admin`, then open **AI item capture**. The status banner reports whether the key is available to the Worker.
+
+### Review-first safety rules and current limits
+
+- Camera access requires HTTPS and explicit device permission. Capture up to five still images; video is not uploaded or analyzed as a video stream in this version.
+- Photos are resized in the browser and sent to the configured AI provider for analysis. **The original photos are not yet saved into OneCopy inventory**; persistent image storage is a future step.
+- No result is saved automatically. **Review & transfer** fills the existing Receive Item form; the operator must verify details and press Save.
+- Suspected old/collectible/high-uncertainty items are routed toward the restricted rear zone for human review. Nothing is published by this feature.
+- Manufacturer, date, edition, hallmark, gemstone/metal, signature, provenance, current price, and sold-comparable claims can be wrong or incomplete. Verify them. If useful market evidence is unavailable, the analysis should return no estimate rather than imply certainty.
+- Requests use a limited number of compressed images per call, but AI and search usage may incur API charges. Check provider billing and use your own key; never commit API keys to GitHub.
+
 ## Browser-first deployment (no Windows deployment tool installation)
 
 1. In Cloudflare Dashboard, create a new D1 database named `onecopy-clean-db`. Keep any older OneCopy database; do not delete it.
