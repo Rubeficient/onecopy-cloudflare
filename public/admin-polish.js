@@ -154,11 +154,14 @@
   var map=$("#systemBadge");if(map)map.title="Health status is checked after sign-in and reflects the Worker/database check, not third-party integration readiness.";
  }
  function patchDynamicTooltips(){
-  document.addEventListener("pointerover",function(e){
-   var btn=e.target.closest("button[data-action]");if(!btn||btn.title)return;
+  var setActionTip=function(e){
+   var target=e.target;if(!target||typeof target.closest!=="function")return;
+   var btn=target.closest("button[data-action]");if(!btn||btn.title)return;
    var action=btn.dataset.action;
    btn.title=({approve:"Approve and publish only after confirming the item, condition, price and physical zone.",middle:"Move this item to the standard middle retail zone. Confirm it is not a rare or unreviewed exception first.",rear:"Move this item to the restricted rear zone for safekeeping and human review.",sold:"Mark the item sold; confirm the physical copy and sale before changing its status."})[action]||"Review the item before using this action.";
-  });
+  };
+  document.addEventListener("pointerover",setActionTip);
+  document.addEventListener("focusin",setActionTip);
  }
  function init(){
   document.body.insertAdjacentHTML("beforeend",guideHtml);
