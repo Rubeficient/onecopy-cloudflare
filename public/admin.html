@@ -64,7 +64,7 @@
 .capture-disclaimer{font-size:10px;color:var(--muted);line-height:1.7;border-top:1px solid var(--line);padding-top:10px;margin-top:12px}
 @media(max-width:1100px){.capture-layout{grid-template-columns:1fr}.capture-results-box{position:static}}
 @media(max-width:600px){.capture-layout{grid-template-columns:1fr}.capture-image-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.capture-thumb img{height:100px}.capture-price-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.capture-price strong{font-size:14px}.capture-button-row .btn,.capture-file-label{flex:1;justify-content:center}.capture-results-box{padding:12px}}
-</style></head>
+</style><link rel="stylesheet" href="/admin-polish.css"></head>
 <body>
 <header class="topbar"><div class="brand"><span class="brandmark">✦</span><span><span class="brandtitle">OneCopy</span><span class="brandtag">Magic Door Books · Control room</span></span></div><div class="topright"><span class="online-badge"><i></i> Inventory workspace</span><a href="/">View storefront ↗</a></div></header>
 <section id="login" class="login-shell"><div class="login-layout"><div class="login-story"><div><div class="login-kicker">Magic Door Books · Pomona</div><h1>Every copy.<br>Every detail.<br>Every story.</h1><p>One quiet, organized place to receive books, protect rare finds, manage the shelves and prepare your online catalog.</p></div><div class="login-quote">“Good books never really leave us.”</div></div><div class="login-formbox"><div class="kicker">Staff access</div><h2>Welcome back.</h2><p class="sub" style="margin:0 0 25px">Sign in to the OneCopy inventory workspace.</p><form id="loginForm"><div class="field"><label for="password">ADMIN PASSWORD</label><input id="password" type="password" autocomplete="current-password" placeholder="Enter your password" required></div><button class="btn" type="submit" style="width:100%;padding:13px">Open the control room →</button></form><div id="loginMsg" class="message hidden"></div><div class="hint">Your workspace is private. Ask the account administrator to update access in Cloudflare if you can't sign in.</div></div></div></section>
@@ -1021,4 +1021,4 @@ $("#ebayListings").addEventListener("click",async function(e){
  catch(err){notice(err.message,true);btn.disabled=false;btn.textContent="Withdraw listing"}
 });
 
-</script></body></html>
+</script><script src="/admin-polish.js"></script></body></html>
