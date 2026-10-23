@@ -1,0 +1,15 @@
+/* OneCopy public storefront polish: keeps active skin tokens while refining details. */
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--theme-accent,#c38d45);outline-offset:3px}
+button,.button,.btn,[role=button]{transition:transform .18s ease,box-shadow .18s ease,background-color .18s ease,border-color .18s ease}
+button:hover:not(:disabled),.button:hover,.btn:hover{transform:translateY(-1px)}
+.product,.category-card,.benefit,.about-note{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.product:hover,.category-card:hover{transform:translateY(-3px);box-shadow:0 18px 42px rgba(25,44,29,.12)}
+.product:focus-within,.category-card:focus-within{outline:2px solid var(--theme-accent,#c38d45);outline-offset:3px}
+img{max-width:100%;height:auto}
+input,select,textarea{max-width:100%}
+::selection{background:var(--theme-accent,#c38d45);color:var(--theme-announcement-text,#fffdf7)}
+@media(max-width:640px){.topnav{gap:10px}.hero{gap:24px}.hero h1{overflow-wrap:anywhere}.searchbar{width:100%;max-width:100%}.catalog-toolbar{gap:10px}.grid{gap:12px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
