@@ -65,11 +65,11 @@
   var matches=commands.filter(function(x){return (x.label+" "+x.detail+" "+x.id).toLowerCase().includes(term)});
   results.innerHTML=matches.map(function(x){return '<button class="oc-command-row" type="button" data-oc-command="'+x.id+'"><span class="oc-command-icon">'+x.icon+'</span><span class="oc-command-copy"><strong>'+x.label+'</strong><small>'+x.detail+'</small></span><kbd>↵</kbd></button>'}).join("")||'<div class="oc-command-empty">No matches. Try “inventory”, “capture”, “design” or “orders”.</div>';
  }
- function openCommands(){renderCommands();openModal($("#ocCommandModal"))}
+ function openCommands(){var field=$("#ocCommandQuery");if(field)field.value="";renderCommands();openModal($("#ocCommandModal"))}
  function installTopbar(){
   var top=$(".topright");if(!top)return;
   var oldBadge=$(".online-badge",top);
-  if(oldBadge){oldBadge.id="systemBadge";oldBadge.innerHTML='<i id="systemDot"></i><span id="systemStatusText">Checking system…</span>'}
+  if(oldBadge){oldBadge.id="systemBadge";oldBadge.innerHTML='<i id="systemDot"></i><span id="systemStatusText">Private workspace</span>'}
   if(!$("#commandOpen")){var c=document.createElement("button");c.type="button";c.id="commandOpen";c.className="top-action";c.innerHTML='⌕ <span>Quick actions</span> <kbd>Ctrl K</kbd>';c.title="Open quick actions (Ctrl/⌘ K)";top.insertBefore(c,$("a",top)||null)}
   if(!$("#helpOpen")){var h=document.createElement("button");h.type="button";h.id="helpOpen";h.className="top-action";h.textContent="? Help";h.title="Open help and workflow shortcuts";top.insertBefore(h,$("a",top)||null)}
   $("#commandOpen").addEventListener("click",openCommands);
@@ -119,7 +119,7 @@
  }
  function watchWorkspace(){
   var app=$("#app");if(!app)return;
-  var refresh=function(){if(!app.classList.contains("hidden"))updateSystemStatus()};
+  var refresh=function(){if(!app.classList.contains("hidden"))updateSystemStatus();else{var label=$("#systemStatusText"),badge=$("#systemBadge");if(label)label.textContent="Private workspace";if(badge)badge.classList.remove("warn","bad")}};
   if(window.MutationObserver)new MutationObserver(refresh).observe(app,{attributes:true,attributeFilter:["class"]});
   document.addEventListener("visibilitychange",function(){if(!document.hidden)refresh()});
  }
