@@ -13,6 +13,21 @@ OneCopy is a simple inventory-backed catalog for Magic Door Books, with the phys
 - **Starts with an empty inventory.** No local catalog import and no demo inventory are required.
 - **Online card checkout and Square are not implemented in this repository yet.** The storefront is currently a catalog preview, not a live store taking payments.
 
+## Control Room polish (0.11.0)
+
+The Control Room now loads a separate presentation/help layer from `public/admin-polish.css` and `public/admin-polish.js`. Keeping these files separate makes UI polish easier to evolve without coupling it to inventory, pricing or marketplace business logic.
+
+- Responsive visual refinement for the admin workspace and customer storefront.
+- First-run getting-started workflow card; dismissal is stored locally in that browser.
+- Searchable Quick Actions palette: `Ctrl+K` on Windows/Linux or `⌘K` on Mac.
+- Help and workflow guide covering receiving, AI capture, restricted-zone rules, publishing, storefront skins, and privacy.
+- `/` focuses inventory search; `?` opens the guide; `Esc` closes dialogs.
+- Admin status badge requests `/health` after sign-in and shows the application version when healthy.
+- Improved keyboard focus states, dialog focus handling, touch targets and reduced-motion support.
+- Storefront polish is additive and keeps the active user-selected skin tokens intact.
+
+The health badge confirms the Worker/database health check, not that third-party services such as eBay, AI research or checkout are fully configured. A deployed 0.11.0 build still requires normal browser testing against the actual Cloudflare environment before being treated as production-proven.
+
 ## AI Item Capture (0.10.0)
 
 The Admin Control Room now has an **AI Item Capture** workspace at `/admin`. It supports a live phone/desktop camera preview, still-photo capture, or image selection; up to five images per analysis; and a reviewable catalog draft for books, clothing, jewelry, antiques/collectibles, home decor, and other stock.
