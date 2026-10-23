@@ -123,6 +123,36 @@
   if(window.MutationObserver)new MutationObserver(refresh).observe(app,{attributes:true,attributeFilter:["class"]});
   document.addEventListener("visibilitychange",function(){if(!document.hidden)refresh()});
  }
+ function applyHelpfulTooltips(){
+  var navHelp={
+   overview:"Overview: a quick read on total stock, online publications, review work and common actions.",
+   receive:"Receive item: add a record using verified details. Save it for review; saving does not itself publish it.",
+   capture:"AI item capture: use multiple photos for identification research. Always verify claims and pricing evidence before saving.",
+   inventory:"Inventory: search by title, author, identifier, location and other record fields; check status before acting.",
+   warehouse:"Store zones: use the physical map to keep routine stock separate from restricted or special items.",
+   design:"Website design: edit and preview skins, save versions, then activate deliberately.",
+   ebay:"eBay marketplace: verify account status, listing settings and shipping policies. Actions can affect real listings.",
+   orders:"Orders: inspect currently recorded orders. Customer checkout and payment workflows may not be enabled."
+  };
+  $("[data-nav]").forEach(function(el){var key=el.dataset.nav;if(navHelp[key])el.title=navHelp[key]});
+  var tips={
+   loginForm:"Sign in with the private admin password configured for this Worker.",
+   saveItemButton:"Save this item as a private inventory record. New items require review and are not automatically published.",
+   resetForm:"Clear the receiving form and return most fields to their starting values.",
+   useMsrp:"Only copy a verified cover price into asking price for an ordinary As New book in Middle retail with no exception flags.",
+   exportCsv:"Export inventory data for private analysis or backup. The file may contain internal notes and acquisition costs.",
+   captureAnalyze:"Send the selected compressed photos to the configured AI service for identification and source research. API usage may cost money.",
+   captureTransfer:"Prefill Receive Item with AI suggestions for review. This does not save the record or publish a listing.",
+   captureStartCamera:"Request camera permission to capture still photos. Choose photos instead if the camera is unavailable.",
+   captureTakePhoto:"Capture the current camera frame as a still photo; up to five photos can be analyzed together.",
+   publishEbayItem:"Publish or update a real eBay listing. Verify price, item, quantity and required settings before confirming.",
+   createEbayLocation:"Register the configured ship-from location with eBay. Confirm the address and location key first.",
+   resetTheme:"Restore the current editor theme defaults; save changes only after checking the preview.",
+   activateTheme:"Make the selected saved skin live on the storefront."
+  };
+  Object.keys(tips).forEach(function(id){var el=$("#"+id);if(el)el.title=tips[id]});
+  var map=$("#systemBadge");if(map)map.title="Health status is checked after sign-in and reflects the Worker/database check, not third-party integration readiness.";
+ }
  function patchDynamicTooltips(){
   document.addEventListener("pointerover",function(e){
    var btn=e.target.closest("button[data-action]");if(!btn||btn.title)return;
@@ -132,7 +162,7 @@
  }
  function init(){
   document.body.insertAdjacentHTML("beforeend",guideHtml);
-  installTopbar();installGettingStarted();bindModalEvents();installKeyboard();watchWorkspace();patchDynamicTooltips();
+  installTopbar();installGettingStarted();bindModalEvents();installKeyboard();watchWorkspace();applyHelpfulTooltips();patchDynamicTooltips();
   if(typeof window.installHelp==="function")window.installHelp();
  }
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
