@@ -24,7 +24,7 @@
   else document.querySelectorAll("[data-panel]").forEach(function(el){el.classList.toggle("hidden",el.dataset.panel!==panel)});
   window.scrollTo({top:0,behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
  }
- var guideHtml=\`
+ var guideHtml=`
  <div id="ocGuideModal" class="oc-overlay" hidden>
   <section class="oc-dialog oc-guide-dialog" role="dialog" aria-modal="true" aria-labelledby="ocGuideTitle" tabindex="-1">
    <div class="oc-dialog-head"><div><div class="kicker">OneCopy field guide</div><h2 id="ocGuideTitle">A calmer way to run the shop.</h2><p>Short instructions, daily workflow, safeguards and keyboard shortcuts.</p></div><button class="icon-button" type="button" data-oc-close aria-label="Close guide">×</button></div>
@@ -45,7 +45,7 @@
    <h2 id="ocCommandTitle" class="sr-only">Quick actions</h2><div id="ocCommandResults" class="oc-command-results"></div>
    <div class="oc-command-foot"><span>Choose an action to continue.</span><span><kbd>Ctrl K</kbd> to open</span></div>
   </section>
- </div>\`;
+ </div>`;
  var commands=[
   {id:"overview",label:"Overview",detail:"Daily activity, inventory health and quick actions",icon:"⌂",run:function(){go("overview")}},
   {id:"receive",label:"Receive item",detail:"Create a new private inventory record",icon:"＋",run:function(){go("receive")}},
