@@ -41,26 +41,29 @@ The Control Room now loads a separate presentation/help layer from `public/admin
 
 The health badge confirms the Worker/database health check, not that third-party services such as eBay, AI research or checkout are fully configured. A deployed 0.11.0 build still requires normal browser testing against the actual Cloudflare environment before being treated as production-proven.
 
-## AI Item Capture (0.10.0)
+## AI Item Capture and provider setup (0.14.0)
 
-The Admin Control Room now has an **AI Item Capture** workspace at `/admin`. It supports a live phone/desktop camera preview, still-photo capture, or image selection; up to five images per analysis; and a reviewable catalog draft for books, clothing, jewelry, antiques/collectibles, home decor, and other stock.
+The **AI Item Capture** workspace at `/admin` supports a live phone/desktop camera preview, still-photo capture, or image selection; up to five images per analysis; and a reviewable catalog draft for books, clothing, jewelry, antiques/collectibles, home decor, and other stock. The Worker now prefers Gemini when `GEMINI_API_KEY` is configured. The Gemini path is designed for free-first photo cataloging: it transcribes and classifies details visible in photos, but does **not** perform live web searches or create unsupported price/comparable claims. Exact barcode-based book metadata is handled separately by Google Books and Open Library.
 
-The analysis endpoint (`POST /api/admin/item-capture/analyze`) is protected by the existing admin session. It sends compressed photos to the OpenAI Responses API, asks the model to extract visible maker/publisher/edition/identifier/condition information, and enables web search for reference listings when supported by the configured model/account. Returned source links, active asking prices, sold-record indicators, uncertainty, and price suggestions are shown separately. An active listing is not a completed sale, and visual identification is not authentication or a formal appraisal.
+### Configure Gemini first
 
-### Configure the AI service
+1. In Google AI Studio, create an API key for a project/model that is currently available to your account.
+2. In Cloudflare Worker → **Settings → Variables and Secrets**, add `GEMINI_API_KEY` as a secret. Optionally set `GEMINI_MODEL` to a model currently available to your project; the code default is `gemini-3.8-flash`.
+3. Deploy, sign in to `/admin`, and open **AI Item Capture**. The status message reports the provider if configured.
 
-1. Create an OpenAI API key for an API project with access to a vision-capable Responses model and web search. **ChatGPT subscriptions and API usage billing are separate.** Review the provider's current model, search, and pricing availability before enabling the feature.
-2. In Cloudflare, open the OneCopy Worker → **Settings → Variables and Secrets** and add `OPENAI_API_KEY` as a secret. Optionally add `OPENAI_MODEL` as a text variable; the default is `gpt-4.1-mini`.
-3. Deploy version 0.10.0, sign in to `/admin`, then open **AI item capture**. The status banner reports whether the key is available to the Worker.
+Gemini's RPM, TPM, and RPD limits depend on the selected model, project, and current AI Studio quota. Do not assume a universal daily number such as 1,000 books. The bulk scanner is paced and uses catalog lookups for ordinary ISBNs; use AI photos for items that need visual extraction instead of calling a generative model once for every common barcode. A free-tier API can still have low quotas, and the quota displayed in AI Studio is the authority.
 
-### Review-first safety rules and current limits
+### Optional OpenAI research path
 
-- Camera access requires HTTPS and explicit device permission. Capture up to five still images; video is not uploaded or analyzed as a video stream in this version.
-- Photos are resized in the browser and sent to the configured AI provider for analysis. **The original photos are not yet saved into OneCopy inventory**; persistent image storage is a future step.
-- No result is saved automatically. **Review & transfer** fills the existing Receive Item form; the operator must verify details and press Save.
-- Suspected old/collectible/high-uncertainty items are routed toward the restricted rear zone for human review. Nothing is published by this feature.
-- Manufacturer, date, edition, hallmark, gemstone/metal, signature, provenance, current price, and sold-comparable claims can be wrong or incomplete. Verify them. If useful market evidence is unavailable, the analysis should return no estimate rather than imply certainty.
-- Requests use a limited number of compressed images per call, but AI and search usage may incur API charges. Check provider billing and use your own key; never commit API keys to GitHub.
+The OpenAI API remains available as an alternative provider: configure `OPENAI_API_KEY` as a Cloudflare secret and optionally `OPENAI_MODEL`. If both Gemini and OpenAI keys are set, Gemini is preferred by default. To deliberately use OpenAI for image capture, set `AI_PROVIDER=openai`. The OpenAI-backed scan price research option can use web search to look for exact-edition printed cover-price evidence, active listings, and completed/sold records when the configured API model/account supports it. This option is separate from free Gemini photo capture and may incur API usage charges. A ChatGPT subscription does not include OpenAI API usage.
+
+### Review-first safety rules and limits
+
+- Photos are resized in the browser and sent to the configured provider only when the operator requests analysis. The current version does not retain original item photos in inventory.
+- AI results are drafts. Verify ISBN/edition, printing, maker, condition, signatures, authenticity, provenance, and any value claim before setting the final price or approving the item.
+- Gemini capture does not run live market research; it deliberately leaves estimated prices blank unless a printed price is actually visible and reported with appropriate caution. Google Books/Open Library book lookup is bibliographic metadata, not a current market price.
+- Exact metadata matches and scans can populate title, author, publisher, year, page count, format where available, language, subjects, description, and a cover URL. Anything not returned stays blank for the manager.
+- Never commit API keys to GitHub. Provider limits and features can change; check the current provider dashboard before processing large batches.
 
 ## Browser-first deployment (no Windows deployment tool installation)
 
