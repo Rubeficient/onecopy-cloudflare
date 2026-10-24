@@ -661,7 +661,7 @@ function applyScanPricing(pricing){
  $("#marketComps").value=evidence.map(function(x){return [x.status,x.title,x.price===null?"price unknown":x.currency+" "+x.price,x.date,x.condition,x.url,x.comparability].filter(Boolean).join(" | ")}).join("\n");
  if(p.estimatedLow!==null||p.estimatedHigh!==null)$("#notes").value+="\nAI researched value range (verify edition/condition): "+(p.estimatedLow===null?"unknown":p.estimatedLow)+"–"+(p.estimatedHigh===null?"unknown":p.estimatedHigh)+". ";
  if(p.notes)$("#notes").value+="\nAI price research: "+p.notes;
- return true;
+ return p.msrp!==null||p.suggestedPrice!==null||p.estimatedLow!==null||p.estimatedHigh!==null||evidence.length>0;
 }
 function renderScanHistory(){
  $("#scanSessionCount").textContent=scanState.totalSaved+" saved";
@@ -699,7 +699,7 @@ async function lookupBarcode(force){
    if($("#scanResearchPrices").checked){
     if(data.pricing&&data.pricing.ok&&applyScanPricing(data.pricing))pricingMessage=" AI price research returned draft values; verify every source and physical condition.";
     else if(data.pricing&&data.pricing.error)pricingMessage=" "+data.pricing.error;
-    else pricingMessage=" AI pricing research did not return a usable estimate; price fields were left blank.";
+    else pricingMessage=" AI pricing research found no usable price evidence; the item remains unpriced.";
    }
    var age=String(data.book.publicationYear||"");
    var message="Matched "+data.book.source+" · "+data.book.title+(data.book.author?" — "+data.book.author:"")+". Metadata filled; condition/cost/shelf and physical-copy flags still need checking."+pricingMessage;
