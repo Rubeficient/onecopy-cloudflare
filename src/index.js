@@ -422,7 +422,7 @@ async function publishEbayItem(env,productId,titleOverride,submittedAspects){
 const PRICE_MATRIX_LABELS={
  msrp:"MSRP / cover price",suggested_used:"Suggested used price",brick_mortar:"Brick-and-mortar price",
  front_window:"Front-window / pop-culture price",signed:"Signed-copy price",first_edition:"First-edition / first-printing price",
- signed_first:"Signed + first-edition price",arc:"Advance reading copy / proof price",signed_arc:"Signed ARC / proof price",full_market:"Full-market / standard price",student_access:"Student / community-access price",installment:"Installment / terms total",custom:"Custom / other price"
+ signed_first:"Signed + first-edition price",arc:"Advance reading copy / proof price",signed_arc:"Signed ARC / proof price",full_market:"Market-rate / full-market (capitalist) price",student_access:"Student / non-capitalist / community-access price",installment_upfront:"Installment plan / upfront payment",installment:"Installment plan / total due",custom:"Custom / other price"
 };
 function normalizePriceMatrix(value,fallbackMsrp){
  const b=value&&typeof value==="object"?value:{};
@@ -515,8 +515,8 @@ async function analyzeItemCaptureWithGemini(body,env){
  const model=s(env.GEMINI_MODEL||"gemini-3.8-flash",100);
  let response;
  try{
-  response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent?key="+encodeURIComponent(env.GEMINI_API_KEY),{
-   method:"POST",headers:{"content-type":"application/json"},
+  response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+   method:"POST",headers:{"content-type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},
    body:JSON.stringify({contents:[{role:"user",parts}],generationConfig:{temperature:0.2,responseMimeType:"application/json",maxOutputTokens:3500}})
   });
  }catch{return json({error:"Could not reach Gemini. Check the Worker network/logs and try again."},502);}
