@@ -618,7 +618,7 @@ async function loadProducts(){try{var d=await api("/api/admin/products");invento
 $("#products").addEventListener("click",async function(e){var b=e.target.closest("button[data-action]");if(!b)return;var a=b.dataset.action,id=b.dataset.id,patch={};if(a==="approve")patch={review_status:"approved",online_published:true,status:"in_stock"};if(a==="middle")patch={zone:"middle_retail",review_status:"needs_partner_review",online_published:false};if(a==="rear")patch={zone:"rear_restricted",review_status:"needs_partner_review",online_published:false};if(a==="sold")patch={status:"sold",online_published:false,quantity:0};try{await api("/api/admin/products/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify(patch)});notice("Item updated.");await loadProducts()}catch(err){notice(err.message,true)}});
 $("#inventorySearch").addEventListener("input",renderProducts);$("#inventoryZone").addEventListener("change",renderProducts);$("#inventoryReview").addEventListener("change",renderProducts);
 
-var scanState={lastLookupBarcode:"",inFlightBarcode:"",duplicates:[],history:[],timer:null,metadataMatched:false};
+var scanState={lastLookupBarcode:"",inFlightBarcode:"",duplicates:[],history:[],totalSaved:0,timer:null,metadataMatched:false};
 function cleanScanCode(value){return String(value||"").replace(/[^0-9xX]/g,"").toUpperCase();}
 function setScanStatus(message,tone){
  var el=$("#scanLookupStatus");el.textContent=message||"";el.className="message"+(tone?" "+tone:"");if(!message)el.classList.add("hidden");
@@ -664,7 +664,7 @@ function applyScanPricing(pricing){
  return true;
 }
 function renderScanHistory(){
- $("#scanSessionCount").textContent=scanState.history.length+" saved";
+ $("#scanSessionCount").textContent=scanState.totalSaved+" saved";
  $("#scanSessionRows").innerHTML=scanState.history.length?scanState.history.slice().reverse().map(function(x){
   return '<div class="scan-history-item"><span><strong>'+esc(x.title)+'</strong><small>'+esc(x.isbn||"No barcode")+' · '+esc(x.zone)+' · '+esc(x.when)+'</small></span><span class="pill">'+esc(x.id)+'</span></div>';
  }).join(""):'<p class="fieldnote">Saved items will appear here. Use “Save & scan next” to keep receiving without switching views.</p>';
@@ -749,7 +749,7 @@ $("#itemForm").addEventListener("submit",async function(e){
  saveBtn.disabled=true;finishBtn.disabled=true;saveBtn.textContent="Saving item…";
  try{
   var result=await api("/api/admin/products",{method:"POST",body:JSON.stringify(body)});
-  scanState.history.push({id:result.id,title:body.title,isbn:body.isbn,zone:body.zone,when:new Date().toLocaleTimeString()});
+  scanState.totalSaved++;scanState.history.push({id:result.id,title:body.title,isbn:body.isbn,zone:body.zone,when:new Date().toLocaleTimeString()});
   if(scanState.history.length>30)scanState.history.shift();renderScanHistory();
   $("#itemForm").reset();$("#scanResearchPrices").checked=retainResearch;
   ["price","msrp","cost","tpv","cpv"].forEach(function(id){$("#"+id).value="0"});
