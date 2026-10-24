@@ -565,16 +565,22 @@ function normalizeGoogleBook(item,barcode){
   metadataNote:"Exact ISBN matched to a Google Books bibliographic record. Physical condition, signature, first printing and acquisition cost are not encoded by the barcode."
  };
 }
-function normalizeOpenLibraryBook(info,barcode){
+async function normalizeOpenLibraryBook(info,barcode){
  if(!info||!info.title)return null;
  const ids=[...normalizedIdentifiers(info.isbn_10),...normalizedIdentifiers(info.isbn_13)];
  if(ids.length&&!ids.includes(barcode))return null;
  let image="";
  if(Array.isArray(info.covers)&&info.covers.length&&Number(info.covers[0])>0)image="https://covers.openlibrary.org/b/id/"+Number(info.covers[0])+"-L.jpg";
  const subjects=Array.isArray(info.subjects)?info.subjects:[];
+ const authorNames=[];
+ for(const author of (Array.isArray(info.authors)?info.authors:[]).slice(0,3)){
+  if(author&&author.name){authorNames.push(s(author.name,200));continue;}
+  const key=String(author&&author.key||"");
+  if(key.startsWith("/authors/")){const authorInfo=await safeExternalJson("https://openlibrary.org"+key+".json",{"user-agent":"OneCopy/0.12.0 (barcode metadata lookup)"});if(authorInfo&&authorInfo.name)authorNames.push(s(authorInfo.name,200));}
+ }
  return {
   found:true,barcode,title:s(info.title,300),subtitle:"",
-  author:Array.isArray(info.authors)?info.authors.map(x=>s(x.name||x,200)).filter(Boolean).join(", "):"",
+  author:authorNames.filter(Boolean).join(", "),
   publisher:firstValue(info.publishers),publicationYear:yearFromDate(info.publish_date||info.publishDate),
   edition:"",pageCount:Number.isFinite(Number(info.number_of_pages))?Number(info.number_of_pages):"",
   format:s(info.physical_format,120),
@@ -597,9 +603,9 @@ async function lookupBookByBarcode(barcode,env){
  if(!result.found&&isbnLike){
   const ol=await safeExternalJson("https://openlibrary.org/isbn/"+encodeURIComponent(barcode)+".json",{"user-agent":"OneCopy/0.12.0 (barcode metadata lookup)"});
   if(ol&&typeof ol==="object"){
-   const matched=normalizeOpenLibraryBook(ol,barcode);
+   const matched=await normalizeOpenLibraryBook(ol,barcode);
    if(matched)result=matched;
-   else if(ol.title&&typeof ol.key==="string"&&ol.key.startsWith("/books/"))result=normalizeOpenLibraryBook(Object.assign({},ol,{isbn_10:[barcode]}),barcode)||result;
+   else if(ol.title&&typeof ol.key==="string"&&ol.key.startsWith("/books/"))result=await normalizeOpenLibraryBook(Object.assign({},ol,{isbn_10:[barcode]}),barcode)||result;
   }
   if(!result.found){
    const searchUrl=new URL("https://openlibrary.org/search.json");
