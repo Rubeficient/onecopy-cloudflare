@@ -10,9 +10,10 @@ var definitions=[
  {key:"signed_first",field:"priceSignedFirst",label:"Signed + first-edition price"},
  {key:"arc",field:"priceArc",label:"Advance reading copy / proof price"},
  {key:"signed_arc",field:"priceSignedArc",label:"Signed ARC / proof price"},
- {key:"full_market",field:"priceFullMarket",label:"Full-market / standard price"},
- {key:"student_access",field:"priceStudentAccess",label:"Student / community-access price"},
- {key:"installment",field:"priceInstallment",label:"Installment / terms total"},
+ {key:"full_market",field:"priceFullMarket",label:"Market-rate / full-market (capitalist) price"},
+ {key:"student_access",field:"priceStudentAccess",label:"Student / non-capitalist / community-access price"},
+ {key:"installment_upfront",field:"priceInstallmentUpfront",label:"Installment plan / upfront payment"},
+ {key:"installment",field:"priceInstallment",label:"Installment plan / total due"},
  {key:"custom",field:"priceCustom",label:"Custom / other price"}
 ];
 var byKey={};definitions.forEach(function(x){byKey[x.key]=x});
@@ -102,7 +103,5 @@ var originalOpen=window.openProductEditor;
 if(typeof originalOpen==="function"){
  window.openProductEditor=function(product){originalOpen(product);window.hydrateOneCopyPriceMatrix("edit",product&&product.pricing_matrix);};
 }
-var useMsrp=document.getElementById("useMsrp");
-if(useMsrp)useMsrp.addEventListener("click",function(){var source=el("","priceSource");if(source&&numeric(el("","msrp"))!==null)source.value="msrp";});
 if(typeof window.installHelp==="function")window.installHelp();
 })();
