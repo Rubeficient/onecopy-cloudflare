@@ -418,6 +418,34 @@ async function publishEbayItem(env,productId,titleOverride,submittedAspects){
  }
 }
 
+
+const PRICE_MATRIX_LABELS={
+ msrp:"MSRP / cover price",suggested_used:"Suggested used price",brick_mortar:"Brick-and-mortar price",
+ front_window:"Front-window / pop-culture price",signed:"Signed-copy price",first_edition:"First-edition / first-printing price",
+ signed_first:"Signed + first-edition price",arc:"Advance reading copy / proof price",signed_arc:"Signed ARC / proof price",custom:"Custom / other price"
+};
+function normalizePriceMatrix(value,fallbackMsrp){
+ const b=value&&typeof value==="object"?value:{};
+ const rawOptions=b.options&&typeof b.options==="object"?b.options:{};
+ const options={};
+ for(const [key,label] of Object.entries(PRICE_MATRIX_LABELS)){
+  const raw=rawOptions[key]&&typeof rawOptions[key]==="object"?rawOptions[key]:{};
+  let amount=raw.amount;
+  if(key==="msrp"&&(amount===undefined||amount===null||amount==="")&&Number(fallbackMsrp)>0)amount=Number(fallbackMsrp);
+  const n=Number(amount);
+  options[key]={label:s(raw.label||(key==="custom"&&b.custom_label?b.custom_label:label),120),amount:amount===undefined||amount===null||amount===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100,notes:s(raw.notes,500)};
+ }
+ return {version:1,regular_key:Object.hasOwn(PRICE_MATRIX_LABELS,b.regular_key)?b.regular_key:"",custom_label:s(b.custom_label,120),notes:s(b.notes,1200),options};
+}
+function itemCaptureProvider(env){
+ const preferred=String(env.AI_PROVIDER||"gemini").toLowerCase();
+ if(preferred==="openai"&&env.OPENAI_API_KEY)return "openai";
+ if(preferred==="gemini"&&env.GEMINI_API_KEY)return "gemini";
+ if(env.GEMINI_API_KEY)return "gemini";
+ if(env.OPENAI_API_KEY)return "openai";
+ return "";
+}
+
 function normal(body){
  const title=s(body.title,300);if(!title&&!s(body.isbn,40))return {error:"Enter a barcode or item title to create an intake draft."};
  const zone=zones.has(body.zone)?body.zone:"rear_restricted";
@@ -427,7 +455,7 @@ function normal(body){
  const published=Boolean(body.online_published)&&zone!=="rear_restricted"&&review==="approved"&&status==="in_stock"&&quantity>0;
  const confidence=["low","medium","high"].includes(body.valuation_confidence)?body.valuation_confidence:"low";
  const basis=["none","sold_comps","catalog","internal_sales","appraisal","partner_judgment"].includes(body.valuation_basis)?body.valuation_basis:"none";
- const extra={cost:m(body.cost),cpv:m(body.cpv),tpv:m(body.tpv),edition:s(body.edition,500),publisher:s(body.publisher,500),publication_year:s(body.publication_year,40),page_count:m(body.page_count),format:s(body.format,150),language:s(body.language,100),subjects:s(body.subjects,1500),metadata_source:s(body.metadata_source,120),metadata_confidence:s(body.metadata_confidence,40),metadata_notes:s(body.metadata_notes,1800),signed:Boolean(body.signed),firstEdition:Boolean(body.first_edition ?? body.firstEdition),special:Boolean(body.special),notes:s(body.notes,3000),market_comps:s(body.market_comps,3000),valuation_basis:basis,valuation_confidence:confidence};
+ const extra={cost:m(body.cost),cpv:m(body.cpv),tpv:m(body.tpv),edition:s(body.edition,500),publisher:s(body.publisher,500),publication_year:s(body.publication_year,40),page_count:m(body.page_count),format:s(body.format,150),language:s(body.language,100),subjects:s(body.subjects,1500),metadata_source:s(body.metadata_source,120),metadata_confidence:s(body.metadata_confidence,40),metadata_notes:s(body.metadata_notes,1800),pricing_matrix:normalizePriceMatrix(body.pricing_matrix,m(body.msrp)),signed:Boolean(body.signed),firstEdition:Boolean(body.first_edition ?? body.firstEdition),special:Boolean(body.special),notes:s(body.notes,3000),market_comps:s(body.market_comps,3000),valuation_basis:basis,valuation_confidence:confidence};
  return {title,author:s(body.author,300),isbn:s(body.isbn,40),category:s(body.category||"Book",100),description:s(body.description,5000),condition:s(body.condition,100),price:m(body.price),msrp:m(body.msrp),stock_mode:body.stock_mode==="quantity"?"quantity":"unique",quantity,status,zone,location:s(body.location,200),review_status:review,online_published:published?1:0,image_url:s(body.image_url,2000),item_json:JSON.stringify(extra)};
 }
 function toAdmin(row){let x={};try{x=JSON.parse(row.item_json||"{}");}catch{}return {...row,...x,item_json:undefined,online_published:Boolean(row.online_published)};}
