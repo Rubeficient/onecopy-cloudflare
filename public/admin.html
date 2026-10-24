@@ -490,7 +490,7 @@ $("#captureTransfer").addEventListener("click",function(){
  notice("AI draft transferred to Receive Item. Confirm the title/edition, condition and price evidence; photos are not yet stored with the record. Save when reviewed.");
 });
 
-function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#isbn").focus()},60);if(name==="capture")setTimeout(function(){loadCaptureStatus()},30);if(name==="ebay")setTimeout(function(){loadEbayPanel()},30);if(name==="design")setTimeout(function(){if(!themeLibraryLoaded)loadThemeLibrary();else sendThemePreview()},30)}
+function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#bulkBarcodeInput").focus()},60);if(name==="capture")setTimeout(function(){loadCaptureStatus()},30);if(name==="ebay")setTimeout(function(){loadEbayPanel()},30);if(name==="design")setTimeout(function(){if(!themeLibraryLoaded)loadThemeLibrary();else sendThemePreview()},30)}
 document.querySelectorAll("[data-nav]").forEach(function(b){b.addEventListener("click",function(){setView(b.dataset.nav)})});
 $("#loginForm").addEventListener("submit",async function(e){e.preventDefault();try{await api("/api/admin/login",{method:"POST",body:JSON.stringify({password:$("#password").value})});$("#password").value="";await appView()}catch(err){msg($("#loginMsg"),err.message,true)}});
 $("#logout").addEventListener("click",async function(){try{await api("/api/admin/logout",{method:"POST",body:"{}"})}catch(e){}loginView()});
@@ -649,13 +649,203 @@ $("#useMsrp").addEventListener("click",function(){
 });
 ["signed","firstEdition","special"].forEach(function(id){$("#"+id).addEventListener("change",function(){if(this.checked)notice("Exception flagged. Route for partner review; do not rely on routine MSRP pricing.")})});
 
-$("#resetForm").addEventListener("click",function(){$("#itemForm").reset();$("#price").value="0";$("#msrp").value="0";$("#cost").value="0";$("#quantity").value="1";$("#tpv").value="0";$("#cpv").value="0";$("#zone").value="middle_retail"});
+$("#resetForm").addEventListener("click",function(){$("#itemForm").reset();["price","msrp","cost","tpv","cpv"].forEach(function(id){$("#"+id).value=""});$("#quantity").value="1";$("#zone").value="";$("#condition").value="";$("#valuationBasis").value="none";$("#valuationConfidence").value="low"});
+
+var editingProductId="";
+function editValue(id,value){var el=$("#"+id);if(el)el.value=value==null?"":String(value);}
+function openProductEditor(p){
+ if(!p)return;editingProductId=p.id;
+ editValue("editTitle",p.title);editValue("editAuthor",p.author);editValue("editIsbn",p.isbn);
+ editValue("editCategory",p.category||"Book");editValue("editPublisher",p.publisher);editValue("editYear",p.publication_year);
+ editValue("editEdition",p.edition);editValue("editPages",Number(p.page_count)>0?p.page_count:"");
+ editValue("editFormat",p.format);editValue("editLanguage",p.language);editValue("editSubjects",p.subjects);
+ editValue("editCondition",p.condition==="Unknown — assess manually"?"":p.condition);
+ editValue("editPrice",Number(p.price)>0?p.price:"");editValue("editMsrp",Number(p.msrp)>0?p.msrp:"");editValue("editCost",Number(p.cost)>0?p.cost:"");
+ editValue("editQuantity",p.quantity==null?1:p.quantity);editValue("editStockMode",p.stock_mode||"unique");
+ editValue("editZone",p.zone||"");editValue("editLocation",p.location);editValue("editCpv",Number(p.cpv)>0?p.cpv:"");editValue("editTpv",Number(p.tpv)>0?p.tpv:"");
+ editValue("editBasis",p.valuation_basis||"none");editValue("editConfidence",p.valuation_confidence||"low");
+ editValue("editImage",p.image_url);editValue("editDescription",p.description);editValue("editMarketComps",p.market_comps);editValue("editNotes",p.notes);
+ $("#editSigned").checked=Boolean(p.signed);$("#editFirstEdition").checked=Boolean(p.firstEdition);$("#editSpecial").checked=Boolean(p.special);
+ $("#productEditModal").hidden=false;document.body.classList.add("oc-modal-open");$("#productEditModal .oc-dialog").focus();
+}
+function closeProductEditor(){if($("#productEditModal").hidden)return;$("#productEditModal").hidden=true;document.body.classList.remove("oc-modal-open");editingProductId="";}
+$("#productEditModal").addEventListener("click",function(e){if(e.target===this||e.target.closest("[data-edit-close]"))closeProductEditor()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!$("#productEditModal").hidden)closeProductEditor()});
+$("#productEditForm").addEventListener("submit",async function(e){
+ e.preventDefault();if(!editingProductId)return;
+ var v=function(id){return $("#"+id).value},button=$("#editSaveButton");button.disabled=true;button.textContent="Saving details…";
+ var body={title:v("editTitle"),author:v("editAuthor"),isbn:v("editIsbn"),category:v("editCategory"),publisher:v("editPublisher"),publication_year:v("editYear"),edition:v("editEdition"),page_count:Number(v("editPages")),format:v("editFormat"),language:v("editLanguage"),subjects:v("editSubjects"),condition:v("editCondition"),price:Number(v("editPrice")),msrp:Number(v("editMsrp")),cost:Number(v("editCost")),quantity:Number(v("editQuantity")),stock_mode:v("editStockMode"),zone:v("editZone"),location:v("editLocation"),cpv:Number(v("editCpv")),tpv:Number(v("editTpv")),valuation_basis:v("editBasis"),valuation_confidence:v("editConfidence"),image_url:v("editImage"),description:v("editDescription"),market_comps:v("editMarketComps"),notes:v("editNotes"),signed:$("#editSigned").checked,first_edition:$("#editFirstEdition").checked,special:$("#editSpecial").checked,review_status:"needs_partner_review",online_published:false};
+ try{await api("/api/admin/products/"+encodeURIComponent(editingProductId),{method:"PATCH",body:JSON.stringify(body)});closeProductEditor();notice("Item details saved. The record remains private until the manager approves it.");await loadProducts();}
+ catch(err){notice(err.message,true)}
+ finally{button.disabled=false;button.textContent="Save as private review draft →"}
+});
 function zoneName(z){return ({front_special:"Front display",middle_retail:"Middle retail",annex_retail:"Annex retail",rear_restricted:"Rear — restricted"})[z]||z}
-function renderProducts(){var q=$("#inventorySearch").value.trim().toLowerCase(),zone=$("#inventoryZone").value,review=$("#inventoryReview").value;var rows=inventoryRows.filter(function(p){return (!zone||p.zone===zone)&&(!review||p.review_status===review)&&(!q||[p.id,p.title,p.author,p.isbn,p.location].some(function(v){return String(v||"").toLowerCase().includes(q)}))});$("#products").innerHTML=rows.length?rows.map(function(p){var actions="";if(!p.online_published)actions+='<button class="btn" data-action="approve" data-id="'+esc(p.id)+'" '+(p.zone==="rear_restricted"?'disabled title="Move out of Rear first"':"")+'>Approve & publish</button>';actions+='<button class="btn secondary" data-action="middle" data-id="'+esc(p.id)+'">Move to Middle</button><button class="btn secondary" data-action="rear" data-id="'+esc(p.id)+'">Restrict</button>';if(p.status!=="sold")actions+='<button class="btn danger" data-action="sold" data-id="'+esc(p.id)+'">Mark sold</button>';var pill=p.review_status==="approved"?"green":p.zone==="rear_restricted"?"red":"gold";return '<tr><td><div class="itemname">'+esc(p.title)+'</div><div class="smallmuted">'+esc(p.author||p.category)+' · '+esc(p.id)+'</div><div class="smallmuted">Qty '+Number(p.quantity||0)+'</div></td><td><strong>'+fmt(p.price)+'</strong><div class="smallmuted">MSRP '+fmt(p.msrp)+'</div></td><td>'+esc(zoneName(p.zone))+'<div class="smallmuted">'+esc(p.location||"No shelf assigned")+'</div></td><td><span class="pill '+pill+'">'+esc(p.review_status)+'</span><div class="smallmuted">'+(p.online_published?"Published":"Private")+" · "+esc(p.status)+'</div></td><td><div class="actions">'+actions+'</div></td></tr>'}).join(""):'<tr><td colspan="5" class="emptyrow">No matching records. Try another search, or receive your first item.</td></tr>';$("#inventoryFooter").textContent="Showing "+rows.length+" of "+inventoryRows.length+" inventory records."}
+function productReady(p){
+ return Boolean(p&&p.title&&!/^SCAN PENDING:/i.test(String(p.title))&&p.condition&&p.condition!=="Unknown — assess manually"&&Number(p.price)>0&&p.zone&&p.zone!=="rear_restricted"&&Number(p.quantity)>0);
+}
+function renderProducts(){
+ var q=$("#inventorySearch").value.trim().toLowerCase(),zone=$("#inventoryZone").value,review=$("#inventoryReview").value;
+ var rows=inventoryRows.filter(function(p){return (!zone||p.zone===zone)&&(!review||p.review_status===review)&&(!q||[p.id,p.title,p.author,p.isbn,p.location].some(function(v){return String(v||"").toLowerCase().includes(q)}))});
+ $("#products").innerHTML=rows.length?rows.map(function(p){
+  var actions="",ready=productReady(p),needsIdentity=/^SCAN PENDING:/i.test(String(p.title||""));
+  actions+='<button class="btn secondary" data-action="edit" data-id="'+esc(p.id)+'">Edit details</button>';
+  if(!p.online_published)actions+='<button class="btn" data-action="approve" data-id="'+esc(p.id)+'" '+(!ready?'disabled title="Complete title, condition, price and retail zone in Edit details first"':"")+'>Approve & publish</button>';
+  actions+='<button class="btn secondary" data-action="middle" data-id="'+esc(p.id)+'">Move to Middle</button><button class="btn secondary" data-action="rear" data-id="'+esc(p.id)+'">Restrict</button>';
+  if(p.status!=="sold")actions+='<button class="btn danger" data-action="sold" data-id="'+esc(p.id)+'">Mark sold</button>';
+  var pill=p.review_status==="approved"?"green":p.zone==="rear_restricted"?"red":"gold";
+  var priceText=Number(p.price)>0?fmt(p.price):"Needs price",msrpText=Number(p.msrp)>0?fmt(p.msrp):"Not set";
+  return '<tr><td><div class="itemname">'+esc(p.title)+'</div><div class="smallmuted">'+esc(p.author||p.category)+' · '+esc(p.id)+'</div><div class="smallmuted">Qty '+Number(p.quantity||0)+(needsIdentity?' · Barcode scan needs identification':'')+'</div></td><td><strong>'+priceText+'</strong><div class="smallmuted">MSRP '+msrpText+'</div></td><td>'+esc(zoneName(p.zone))+'<div class="smallmuted">'+esc(p.location||"No shelf assigned")+'</div></td><td><span class="pill '+pill+'">'+esc(p.review_status)+'</span><div class="smallmuted">'+(p.online_published?"Published":"Private")+" · "+esc(p.status)+'</div></td><td><div class="actions">'+actions+'</div></td></tr>';
+ }).join(""):'<tr><td colspan="5" class="emptyrow">No matching records. Try another search, or receive your first item.</td></tr>';
+ $("#inventoryFooter").textContent="Showing "+rows.length+" of "+inventoryRows.length+" inventory records.";
+}
 function updateDashboard(){var total=inventoryRows.length,published=inventoryRows.filter(function(p){return p.online_published}).length,review=inventoryRows.filter(function(p){return p.review_status!=="approved"||p.zone==="rear_restricted"}).length,rear=inventoryRows.filter(function(p){return p.zone==="rear_restricted"}).length;$("#statTotal").textContent=total;$("#statPublished").textContent=published;$("#statReview").textContent=review;$("#statRear").textContent=rear;var queue=inventoryRows.filter(function(p){return p.review_status!=="approved"||p.zone==="rear_restricted"}).slice(0,5);$("#overviewQueue").innerHTML=queue.length?queue.map(function(p){return '<div class="queue-item"><span><strong>'+esc(p.title)+'</strong><small>'+esc(zoneName(p.zone))+' · '+esc(p.id)+'</small></span><span class="pill '+(p.zone==="rear_restricted"?"red":"gold")+'">'+(p.zone==="rear_restricted"?"Restricted":"Review")+'</span></div>'}).join(""):'<div class="queue-item"><span><strong>All caught up.</strong><small>No review items in the current inventory.</small></span><span class="pill green">Clear</span></div>'}
 async function loadProducts(){try{var d=await api("/api/admin/products");inventoryRows=d.products||[];updateDashboard();renderProducts()}catch(e){if(e.message.indexOf("sign in")>=0)loginView();else{console.error("OneCopy inventory load failed:",e);$("#overviewQueue").innerHTML='<div class="message error">Inventory could not load: '+esc(e.message)+'</div>';$("#products").innerHTML='<tr><td colspan="5" class="emptyrow">Inventory could not load: '+esc(e.message)+'</td></tr>';$("#inventoryFooter").textContent="Check the message above; existing inventory has not been deleted.";notice("Inventory could not load: "+e.message,true)}}}
-$("#products").addEventListener("click",async function(e){var b=e.target.closest("button[data-action]");if(!b)return;var a=b.dataset.action,id=b.dataset.id,patch={};if(a==="approve")patch={review_status:"approved",online_published:true,status:"in_stock"};if(a==="middle")patch={zone:"middle_retail",review_status:"needs_partner_review",online_published:false};if(a==="rear")patch={zone:"rear_restricted",review_status:"needs_partner_review",online_published:false};if(a==="sold")patch={status:"sold",online_published:false,quantity:0};try{await api("/api/admin/products/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify(patch)});notice("Item updated.");await loadProducts()}catch(err){notice(err.message,true)}});
+$("#products").addEventListener("click",async function(e){
+ var b=e.target.closest("button[data-action]");if(!b)return;
+ var a=b.dataset.action,id=b.dataset.id,patch={};
+ if(a==="edit"){openProductEditor(inventoryRows.find(function(p){return p.id===id}));return;}
+ if(a==="approve"){
+  var candidate=inventoryRows.find(function(p){return p.id===id});
+  if(!productReady(candidate)){notice("Complete the title, physical condition, asking price and retail zone in Edit details before approval.",true);openProductEditor(candidate);return;}
+  patch={review_status:"approved",online_published:true,status:"in_stock"};
+ }
+ if(a==="middle")patch={zone:"middle_retail",review_status:"needs_partner_review",online_published:false};
+ if(a==="rear")patch={zone:"rear_restricted",review_status:"needs_partner_review",online_published:false};
+ if(a==="sold")patch={status:"sold",online_published:false,quantity:0};
+ try{await api("/api/admin/products/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify(patch)});notice("Item updated.");await loadProducts();}
+ catch(err){notice(err.message,true)}
+});
 $("#inventorySearch").addEventListener("input",renderProducts);$("#inventoryZone").addEventListener("change",renderProducts);$("#inventoryReview").addEventListener("change",renderProducts);
+
+
+var bulkQueue=[],bulkQueueSerial=0,bulkSaving=false,bulkLookingUp=false;
+function setBulkStatus(message,tone){var el=$("#bulkScanStatus");el.textContent=message||"";el.className="message"+(tone?" "+tone:"");if(!message)el.classList.add("hidden");}
+function bulkQueueCounts(){var counts={};bulkQueue.forEach(function(x){counts[x.barcode]=(counts[x.barcode]||0)+1});return counts;}
+function renderBulkQueue(){
+ var counts=bulkQueueCounts();
+ $("#bulkQueueCount").textContent=bulkQueue.length+" scanned";
+ var matches=bulkQueue.filter(function(x){return x.state==="matched"}).length,missing=bulkQueue.filter(function(x){return x.state==="missing"}).length,queued=bulkQueue.filter(function(x){return x.state==="queued"||x.state==="error"}).length,dups=bulkQueue.filter(function(x){return (x.duplicates||[]).length>0}).length;
+ $("#bulkQueueSummary").textContent=matches+" metadata matches · "+missing+" need manager identification · "+queued+" awaiting lookup · "+dups+" existing-record warning(s)";
+ $("#bulkLookupButton").disabled=!bulkQueue.length||bulkLookingUp||bulkSaving||!queued;
+ $("#bulkSaveButton").disabled=!bulkQueue.length||bulkSaving||bulkLookingUp;
+ $("#bulkClearButton").disabled=bulkSaving||bulkLookingUp;
+ if(!bulkQueue.length){$("#bulkQueueRows").innerHTML='<p class="fieldnote">Each scan becomes a separate item. Repeated ISBNs are kept as separate copies, but OneCopy will flag them for confirmation.</p>';return;}
+ $("#bulkQueueRows").innerHTML=bulkQueue.slice(-60).map(function(item){
+  var title=item.book&&item.book.found?[item.book.title,item.book.subtitle].filter(Boolean).join(": "):"SCAN PENDING: manager identification";
+  var status=item.state==="matched"?"Metadata matched":item.state==="missing"?"No catalogue match":item.state==="looking"?"Looking up…":item.state==="error"?"Lookup error":"Awaiting lookup";
+  var warning=(item.duplicates&&item.duplicates.length)?" · "+item.duplicates.length+" existing record(s)":(counts[item.barcode]>1?" · "+counts[item.barcode]+" copies in this batch":"");
+  return '<div class="bulk-queue-item"><div class="bulk-queue-main"><strong>'+esc(item.barcode)+'</strong><span>'+esc(title)+'</span><small>'+esc(status+warning)+'</small></div><button class="icon-button" type="button" data-bulk-remove="'+item.key+'" aria-label="Remove scan '+esc(item.barcode)+'">×</button></div>';
+ }).join("")+(bulkQueue.length>60?'<p class="fieldnote">Showing the latest 60 of '+bulkQueue.length+' queued scans. All queued items will be processed.</p>':"");
+}
+function isBarcodeToken(value){var code=cleanScanCode(value);return code.length>=8&&code.length<=14?code:"";}
+function splitImportLine(line,delimiter){
+ var cells=[],current="",quoted=false;
+ for(var i=0;i<line.length;i++){var ch=line[i];if(ch==='"'){if(quoted&&line[i+1]==='"'){current+='"';i++;}else quoted=!quoted;}else if(ch===delimiter&&!quoted){cells.push(current.trim());current="";}else current+=ch;}
+ cells.push(current.trim());return cells;
+}
+function parseBarcodeBatch(text){
+ var lines=String(text||"").replace(/^\uFEFF/,"").split(/\r?\n/).filter(function(x){return x.trim()});
+ if(!lines.length)return [];
+ var delim=lines[0].indexOf("\t")>=0?"\t":(lines[0].indexOf(";")>=0?";":",");
+ var first=splitImportLine(lines[0],delim),headerIndex=-1;
+ first.forEach(function(cell,i){if(headerIndex<0&&/(barcode|isbn|upc|ean|item.?code|product.?code)/i.test(cell))headerIndex=i;});
+ var start=headerIndex>=0?1:0,codes=[];
+ for(var r=start;r<lines.length;r++){
+  var cells=splitImportLine(lines[r],delim),candidate="";
+  if(headerIndex>=0&&cells[headerIndex])candidate=isBarcodeToken(cells[headerIndex]);
+  if(!candidate){for(var j=0;j<cells.length;j++){candidate=isBarcodeToken(cells[j]);if(candidate)break;}}
+  if(!candidate)candidate=isBarcodeToken(lines[r]);
+  if(candidate)codes.push(candidate);
+ }
+ return codes;
+}
+function addBulkCodes(rawCodes,source){
+ var codes=(rawCodes||[]).map(isBarcodeToken).filter(Boolean),available=Math.max(0,200-bulkQueue.length),added=0;
+ codes.slice(0,available).forEach(function(code){bulkQueue.push({key:++bulkQueueSerial,barcode:code,state:"queued",book:null,duplicates:[],error:""});added++;});
+ renderBulkQueue();
+ if(codes.length>available)setBulkStatus("Queued "+added+" code(s) from "+source+". The 200-item batch limit was reached; import the remaining file separately.","error");
+ else if(!added)setBulkStatus("No valid 8–14 digit barcode was found in "+source+". Check the file/export format or scanner suffix settings.","error");
+ else setBulkStatus("Queued "+added+" barcode scan(s) from "+source+". Repeated barcodes are kept as separate physical copies. Select Look up metadata when ready.");
+ return added;
+}
+function queueCurrentBulkCode(){
+ var input=$("#bulkBarcodeInput"),code=isBarcodeToken(input.value);
+ if(!code){setBulkStatus("Scan a barcode of 8–14 digits. Configure the Eyoyo scanner to send Enter after every scan.","error");input.focus();return;}
+ if(bulkQueue.length>=200){setBulkStatus("This batch already has 200 items. Save it before starting another batch.","error");return;}
+ addBulkCodes([code],"scanner");input.value="";input.focus();
+}
+$("#bulkBarcodeInput").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();queueCurrentBulkCode();}});
+$("#bulkQueueCurrentButton").addEventListener("click",queueCurrentBulkCode);
+$("#bulkFocusScannerButton").addEventListener("click",function(){$("#bulkBarcodeInput").focus()});
+$("#bulkBarcodeFile").addEventListener("change",async function(){
+ var file=this.files&&this.files[0];if(!file)return;
+ try{var text=await file.text(),codes=parseBarcodeBatch(text);addBulkCodes(codes,file.name);}
+ catch(err){setBulkStatus("Could not read this file. Try exporting it as TXT, CSV or TSV.","error");}
+ finally{this.value=""}
+});
+$("#bulkAddPastedButton").addEventListener("click",function(){var codes=parseBarcodeBatch($("#bulkPasteText").value);var n=addBulkCodes(codes,"pasted list");if(n)$("#bulkPasteText").value="";});
+$("#bulkQueueRows").addEventListener("click",function(e){var button=e.target.closest("[data-bulk-remove]");if(!button)return;var key=Number(button.dataset.bulkRemove);bulkQueue=bulkQueue.filter(function(x){return x.key!==key});renderBulkQueue();});
+$("#bulkClearButton").addEventListener("click",function(){if(bulkQueue.length&&!window.confirm("Clear the current unsaved scan batch? The batch will not be saved to inventory."))return;bulkQueue=[];renderBulkQueue();setBulkStatus("");});
+async function lookupBulkQueue(){
+ if(bulkLookingUp||!bulkQueue.length)return;
+ bulkLookingUp=true;renderBulkQueue();
+ var pending=bulkQueue.filter(function(x){return x.state==="queued"||x.state==="error"}),cursor=0,finished=0,cache=new Map();
+ setBulkStatus("Looking up metadata for "+pending.length+" scan(s). This can take a little while for a large batch.");
+ async function runner(){
+  while(cursor<pending.length){
+   var item=pending[cursor++];item.state="looking";renderBulkQueue();
+   try{
+    var data;
+    if(cache.has(item.barcode))data=cache.get(item.barcode);
+    else{data=await api("/api/admin/catalog/lookup",{method:"POST",body:JSON.stringify({barcode:item.barcode,researchPrices:false})});cache.set(item.barcode,data);}
+    item.book=data.book&&data.book.found?data.book:null;item.duplicates=Array.isArray(data.duplicates)?data.duplicates:[];
+    item.state=item.book?"matched":"missing";item.error=item.book?"":(data.book&&data.book.reason||"No exact catalog match.");
+   }catch(err){item.state="error";item.error=err.message||"Lookup failed";}
+   finished++;renderBulkQueue();setBulkStatus("Metadata lookup complete for "+finished+" of "+pending.length+" scan(s).");
+  }
+ }
+ try{await Promise.all(Array.from({length:Math.min(3,pending.length)},runner));}
+ finally{bulkLookingUp=false;renderBulkQueue();setBulkStatus("Lookup finished. "+bulkQueue.filter(function(x){return x.state==="matched"}).length+" matched; "+bulkQueue.filter(function(x){return x.state==="missing"||x.state==="error"}).length+" need manager identification or another lookup.",bulkQueue.some(function(x){return x.state==="error"||x.state==="missing"})?"error":"");}
+}
+$("#bulkLookupButton").addEventListener("click",lookupBulkQueue);
+function buildBulkRecord(item){
+ var book=item.book||null,found=Boolean(book&&book.found),barcode=item.barcode;
+ var title=found?[book.title,book.subtitle].filter(Boolean).join(": "):"SCAN PENDING: "+barcode;
+ return {title:title,author:found?(book.author||""):"",isbn:barcode,category:found?"Book":((barcode.length===10||barcode.length===13)?"Book":"Other"),
+  description:found?(book.description||""):"",condition:"",price:"",msrp:"",cost:"",cpv:"",tpv:"",
+  zone:"rear_restricted",location:"",quantity:1,stock_mode:"unique",valuation_basis:"none",valuation_confidence:"low",
+  signed:false,first_edition:false,special:false,image_url:found?(book.imageUrl||""):"",
+  notes:"",market_comps:"",edition:found?(book.edition||""):"",publisher:found?(book.publisher||""):"",
+  publication_year:found?String(book.publicationYear||""):"",page_count:found?(book.pageCount||""):"",format:found?(book.format||""):"",
+  language:found?(book.language||""):"",subjects:found?(book.subjects||""):"",
+  metadata_source:found?(book.source||""):"",metadata_confidence:found?(book.confidence||"low"):"low",
+  metadata_notes:found?(book.metadataNote||""):"No exact catalog metadata match returned; manager identification required before approval.",
+  review_status:"needs_partner_review",online_published:false
+ };
+}
+async function saveBulkQueue(){
+ if(bulkSaving||!bulkQueue.length)return;
+ if(bulkQueue.some(function(x){return x.state==="queued"||x.state==="error"}))await lookupBulkQueue();
+ if(!bulkQueue.length)return;
+ var unmatched=bulkQueue.filter(function(x){return !x.book}).length,existing=bulkQueue.filter(function(x){return (x.duplicates||[]).length}).length;
+ var counts=bulkQueueCounts(),repeated=Object.keys(counts).filter(function(code){return counts[code]>1}).length;
+ var prompt="Save "+bulkQueue.length+" scanned item(s) as private review drafts?";
+ if(unmatched)prompt+="\n"+unmatched+" scan(s) had no exact metadata match and will be saved as SCAN PENDING records for manager identification.";
+ if(existing||repeated)prompt+="\nThere are "+existing+" scan(s) with existing inventory records and "+repeated+" barcode(s) repeated in this batch. Each scan will create a separate copy record if confirmed.";
+ prompt+="\nNothing will be published. Unknown condition, price, cost, shelf and other facts remain blank.";
+ if(!window.confirm(prompt))return;
+ bulkSaving=true;renderBulkQueue();$("#bulkSaveButton").textContent="Saving batch…";
+ try{
+  var data=await api("/api/admin/products/bulk",{method:"POST",body:JSON.stringify({items:bulkQueue.map(buildBulkRecord)})});
+  var saved=Array.isArray(data.items)?data.items:[];
+  saved.forEach(function(item){scanState.totalSaved++;scanState.history.push({id:item.id,title:item.title,isbn:item.isbn,zone:item.zone,when:new Date().toLocaleTimeString()});if(scanState.history.length>30)scanState.history.shift();});
+  renderScanHistory();bulkQueue=[];renderBulkQueue();await loadProducts();
+  setBulkStatus("Saved "+saved.length+" private draft(s). All remain out of the public storefront until a manager completes and approves them.");
+  notice("Saved batch of "+saved.length+" private review draft(s).");$("#bulkBarcodeInput").focus();
+ }catch(err){setBulkStatus("Batch save failed: "+err.message+". The queue is still here; you can retry without re-scanning.","error");notice(err.message,true);}
+ finally{bulkSaving=false;$("#bulkSaveButton").textContent="Save all as private drafts →";renderBulkQueue();}
+}
+$("#bulkSaveButton").addEventListener("click",saveBulkQueue);
 
 var scanState={lastLookupBarcode:"",inFlightBarcode:"",duplicates:[],history:[],totalSaved:0,timer:null,metadataMatched:false};
 function cleanScanCode(value){return String(value||"").replace(/[^0-9xX]/g,"").toUpperCase();}
@@ -664,7 +854,6 @@ function setScanStatus(message,tone){
 }
 function median(values){var a=values.filter(function(x){return Number.isFinite(x)&&x>=0}).sort(function(x,y){return x-y});if(!a.length)return 0;var m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2;}
 function fillScanMetadata(book,barcode){
- var year=parseInt(String(book.publicationYear||"").slice(0,4),10),cutoff=new Date().getFullYear()-30;
  $("#isbn").value=barcode;
  $("#title").value=[book.title,book.subtitle].filter(Boolean).join(": ");
  $("#author").value=book.author||"";$("#publisher").value=book.publisher||"";
@@ -674,18 +863,14 @@ function fillScanMetadata(book,barcode){
  var formatOptions=Array.from($("#format").options).map(function(o){return o.value||o.text});
  $("#format").value=formatOptions.indexOf(fmt)>=0?fmt:"";
  $("#language").value=book.language||"";$("#subjects").value=book.subjects||"";
- $("#category").value="Book";$("#condition").value="Unknown — assess manually";
- $("#price").value="0";$("#msrp").value="0";$("#cost").value="0";$("#cpv").value="0";$("#tpv").value="0";
- $("#quantity").value="1";$("#stockMode").value="unique";
- $("#valuationBasis").value="none";$("#valuationConfidence").value="low";
+ $("#category").value="Book";$("#condition").value="";
+ $("#price").value="";$("#msrp").value="";$("#cost").value="";$("#cpv").value="";$("#tpv").value="";
+ $("#quantity").value="1";$("#stockMode").value="unique";$("#valuationBasis").value="none";$("#valuationConfidence").value="low";
  $("#signed").checked=false;$("#firstEdition").checked=false;$("#special").checked=false;
  $("#marketComps").value="";$("#image").value=book.imageUrl||"";
  $("#description").value=book.description||"";
  $("#metadataSource").value=book.source||"";$("#metadataConfidence").value=book.confidence||"low";$("#metadataNotes").value=book.metadataNote||"";
- $("#zone").value=year&&year<cutoff?"rear_restricted":"middle_retail";
- if(!$("#description").value)$("#description").value="Bibliographic metadata matched to ISBN "+barcode+". Add a customer-facing description after checking this physical copy.";
- $("#notes").value="Barcode identity is not a physical inspection. Verify condition, completeness, acquisition cost, actual format, signed/inscribed status, first printing and any unusual/special features before approval.";
- if(year&&year<cutoff)$("#notes").value+=" This edition appears older than 30 years based on the edition publication year; it has been routed to Rear — restricted for partner review.";
+ $("#zone").value="";$("#location").value="";$("#notes").value="";
  scanState.metadataMatched=true;
 }
 function applyScanPricing(pricing){
