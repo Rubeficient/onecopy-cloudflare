@@ -1,6 +1,6 @@
 {
   "name": "onecopy-commerce-cloudflare",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "type": "module",
   "description": "OneCopy Commerce for Cloudflare Workers and D1 with optional Square payments",
