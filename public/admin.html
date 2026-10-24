@@ -608,11 +608,19 @@ $("#exportCsv").addEventListener("click",function(){
   ["Valuation Confidence","valuation_confidence"],["Comparable Sales/Sources","market_comps"],["Quantity","quantity"],
   ["Stock Mode","stock_mode"],["Status","status"],["Zone","zone"],["Shelf/Bin","location"],
   ["Review Status","review_status"],["Online Published","online_published"],["Image URL","image_url"],
-  ["Signed","signed"],["First Edition","firstEdition"],["Special Copy","special"],["Edition","edition"],["Staff Notes","notes"]
+  ["Signed","signed"],["First Edition","firstEdition"],["Special Copy","special"],["Edition","edition"],["Staff Notes","notes"],
+  ["Price Matrix Regular Source","matrix_regular_key"],["Suggested Used Price","matrix_suggested_used"],["Brick-and-Mortar Price","matrix_brick_mortar"],["Front Window Price","matrix_front_window"],["Signed Price","matrix_signed"],["First Edition Price","matrix_first_edition"],["Signed + First Price","matrix_signed_first"],["ARC Price","matrix_arc"],["Signed ARC Price","matrix_signed_arc"],["Market-Rate / Full-Market Price","matrix_full_market"],["Student / Community Price","matrix_student_access"],["Installment Upfront Payment","matrix_installment_upfront"],["Installment Total Due","matrix_installment"],["Custom Price Label","matrix_custom_label"],["Custom Price","matrix_custom"],["Price Matrix Notes","matrix_notes"]
  ];
  var lines=[fields.map(function(f){return csvQuote(f[0])}).join(",")];
  inventoryRows.forEach(function(p){lines.push(fields.map(function(f){
   var value=p[f[1]];
+  if(f[1].indexOf("matrix_")===0){
+   var matrix=p.pricing_matrix||{},options=matrix.options||{},key=f[1].slice(7);
+   if(key==="regular_key")value=matrix.regular_key||"";
+   else if(key==="custom_label")value=matrix.custom_label||"";
+   else if(key==="notes")value=matrix.notes||"";
+   else value=options[key]&&options[key].amount!==undefined&&options[key].amount!==null?options[key].amount:"";
+  }
   if(f[1]==="online_published"||["signed","firstEdition","special"].includes(f[1]))value=value?"Yes":"No";
   return csvQuote(value);
  }).join(","))});
