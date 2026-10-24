@@ -83,11 +83,11 @@
 <section id="receivePanel" data-panel="receive" class="hidden"><section class="panel"><div class="panel-head"><div><div class="kicker">Receiving station</div><h2>Receive a new item</h2><p class="explain">Catalog it once, assign its destination and keep it private until reviewed.</p></div><span class="pill gold">NEW RECORD</span></div>
 
 <section class="bulk-scan-panel" aria-labelledby="bulkScanTitle">
- <div class="bulk-scan-head"><div><div class="kicker">Rapid intake · Batch mode</div><h3 id="bulkScanTitle">Bulk scan from Eyoyo</h3><p>Scan continuously into the queue, or import a scanner-exported TXT, CSV or TSV file. Look up metadata, then save the whole batch as private review drafts.</p></div><span class="pill gold">UP TO 200 ITEMS</span></div>
- <div class="bulk-scanner-row"><div class="field"><label for="bulkBarcodeInput">SCANNER INPUT · SCAN EACH ITEM, THEN ENTER</label><input id="bulkBarcodeInput" type="text" autocomplete="off" inputmode="numeric" placeholder="Click here, then scan a barcode"><span class="fieldnote">Works with Eyoyo USB or wireless scanners configured as a keyboard. Configure the scanner to append Enter/Return after each barcode.</span></div><button class="btn secondary" id="bulkQueueCurrentButton" type="button">Queue code</button></div>
+ <div class="bulk-scan-head"><div><div class="kicker">Rapid intake · Batch mode</div><h3 id="bulkScanTitle">Bulk scan from Eyoyo</h3><p>Scan continuously, paste a list, or import a TXT/CSV/TSV/XLS/XLSX export from your Eyoyo data collector. OneCopy looks up each barcode, fills verified bibliographic fields, and saves the batch as private drafts for manager completion.</p></div><span class="pill gold">UP TO 200 ITEMS</span></div>
+ <div class="bulk-scanner-row"><div class="field"><label for="bulkBarcodeInput">SCANNER INPUT · SCAN EACH ITEM, THEN ENTER</label><input id="bulkBarcodeInput" type="text" autocomplete="off" inputmode="numeric" placeholder="Click here, then scan a barcode"><span class="fieldnote">For instant-scan mode, focus this box and configure Enter/Return after each barcode. For Eyoyo storage mode, export the collected data below or use Keyboard Export if your model supports it.</span></div><button class="btn secondary" id="bulkQueueCurrentButton" type="button">Queue code</button></div>
  <div class="bulk-import-grid">
-  <div class="field"><label for="bulkBarcodeFile">IMPORT SCANNER EXPORT</label><input id="bulkBarcodeFile" type="file" accept=".txt,.csv,.tsv,text/plain,text/csv"><span class="fieldnote">Supported formats: TXT, CSV, TSV. If the Eyoyo utility exports Excel, save/export that file as CSV first.</span></div>
-  <div class="field"><label for="bulkPasteText">OR PASTE A LIST OF BARCODES</label><textarea id="bulkPasteText" rows="3" placeholder="One barcode per line, or paste a CSV/TSV export"></textarea><button class="btn secondary" id="bulkAddPastedButton" type="button">Add pasted codes to queue</button></div>
+  <div class="field"><label for="bulkBarcodeFile">IMPORT SCANNER EXPORT</label><input id="bulkBarcodeFile" type="file" accept=".txt,.csv,.tsv,.xls,.xlsx,text/plain,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><span class="fieldnote">TXT, CSV, TSV, XLS and XLSX are supported. Eyoyo storage-mode exports can be imported as files; spreadsheet files are read locally in this browser.</span></div>
+  <div class="field"><label for="bulkPasteText">OR PASTE A LIST OF BARCODES</label><textarea id="bulkPasteText" rows="3" placeholder="One barcode per line, or paste the Eyoyo keyboard export here"></textarea><button class="btn secondary" id="bulkAddPastedButton" type="button">Add pasted codes to queue</button><span class="fieldnote">Inventory exports with a Barcode/ISBN and Qty/Count column expand into one draft per physical copy. Batches are limited to 200 items.</span></div>
  </div>
  <div id="bulkScanStatus" class="message hidden" role="status" aria-live="polite"></div>
  <div class="bulk-queue-summary"><strong id="bulkQueueCount">0 scanned</strong><span id="bulkQueueSummary">No batch items yet.</span></div>
@@ -96,7 +96,7 @@
 </section>
 <form id="itemForm"><div class="formgrid">
 <div class="field wide scan-field"><label for="isbn">SCAN ISBN / UPC / BARCODE FIRST</label><div class="scan-row"><input id="isbn" maxlength="40" autocomplete="off" inputmode="numeric" placeholder="Scan a book ISBN barcode" aria-describedby="scanHint"><button class="btn secondary" id="lookupBarcode" type="button">Look up scan ↗</button></div><span id="scanHint" class="fieldnote">A USB scanner can type here like a keyboard. Lookups start automatically after a barcode is entered.</span><div id="scanLookupStatus" class="message hidden" role="status" aria-live="polite"></div><input id="metadataSource" type="hidden"><input id="metadataConfidence" type="hidden"><input id="metadataNotes" type="hidden"></div>
-<div class="field"><label for="title">TITLE / ITEM NAME *</label><input id="title" required maxlength="300" placeholder="Filled from exact book match when available"></div><div class="field"><label for="author">AUTHOR / MAKER</label><input id="author" maxlength="300" placeholder="Author, artist or brand"></div>
+<div class="field"><label for="title">TITLE / ITEM NAME *</label><input id="title" maxlength="300" placeholder="Filled from exact book match when available"></div><div class="field"><label for="author">AUTHOR / MAKER</label><input id="author" maxlength="300" placeholder="Author, artist or brand"></div>
 <div class="field"><label for="publisher">PUBLISHER</label><input id="publisher" maxlength="500" placeholder="Publisher or imprint"></div><div class="field"><label for="publicationYear">EDITION PUBLICATION YEAR</label><input id="publicationYear" maxlength="40" placeholder="Year for this edition"></div>
 <div class="field"><label for="edition">EDITION / PRINTING NOTES</label><input id="edition" maxlength="500" placeholder="Only if verified"></div><div class="field"><label for="pageCount">PAGE COUNT</label><input id="pageCount" type="number" min="0" step="1" placeholder="Pages"></div>
 <div class="field"><label for="format">FORMAT</label><select id="format"><option value="">Unknown</option><option>Hardcover</option><option>Paperback</option><option>Mass market paperback</option><option>Large print</option><option>Spiral bound</option><option>Audio</option><option>eBook</option><option>Book</option><option>Other</option></select></div><div class="field"><label for="language">LANGUAGE</label><input id="language" maxlength="100" placeholder="Language"></div>
@@ -313,13 +313,13 @@
   <div class="oc-dialog-head"><div><div class="kicker">Manager review · Inventory record</div><h2 id="productEditTitle">Complete item details</h2><p>Auto-captured facts are prefilled. Unknown fields remain blank. Saving keeps this item private and awaiting approval.</p></div><button class="icon-button" type="button" data-edit-close aria-label="Close editor">×</button></div>
   <form id="productEditForm">
    <div class="formgrid edit-form-grid">
-    <div class="field"><label for="editTitle">TITLE / ITEM NAME *</label><input id="editTitle" required maxlength="300"></div><div class="field"><label for="editAuthor">AUTHOR / MAKER</label><input id="editAuthor" maxlength="300"></div>
+    <div class="field"><label for="editTitle">TITLE / ITEM NAME *</label><input id="editTitle" maxlength="300"></div><div class="field"><label for="editAuthor">AUTHOR / MAKER</label><input id="editAuthor" maxlength="300"></div>
     <div class="field"><label for="editIsbn">ISBN / BARCODE</label><input id="editIsbn" maxlength="40"></div><div class="field"><label for="editCategory">DEPARTMENT</label><select id="editCategory"><option>Book</option><option>Clothing</option><option>Jewelry</option><option>Antique / Collectible</option><option>Home decor</option><option>Gift</option><option>Snack</option><option>Beverage</option><option>Coffee</option><option>Game</option><option>Stationery</option><option>Other</option></select></div>
     <div class="field"><label for="editPublisher">PUBLISHER</label><input id="editPublisher" maxlength="500"></div><div class="field"><label for="editYear">EDITION PUBLICATION YEAR</label><input id="editYear" maxlength="40"></div>
     <div class="field"><label for="editEdition">EDITION / PRINTING NOTES</label><input id="editEdition" maxlength="500"></div><div class="field"><label for="editPages">PAGE COUNT</label><input id="editPages" type="number" min="0" step="1"></div>
     <div class="field"><label for="editFormat">FORMAT</label><input id="editFormat" maxlength="150" placeholder="Hardcover, paperback…"></div><div class="field"><label for="editLanguage">LANGUAGE</label><input id="editLanguage" maxlength="100"></div>
     <div class="field wide"><label for="editSubjects">SUBJECTS / CATEGORIES</label><input id="editSubjects" maxlength="1500"></div>
-    <div class="field"><label for="editCondition">PHYSICAL CONDITION *</label><select id="editCondition" required><option value="">Not assessed</option><option>As New</option><option>Very Good</option><option>Good</option><option>Acceptable</option><option>Fair</option><option>Unknown — assess manually</option><option>Not Applicable</option></select></div><div class="field"><label for="editPrice">ASKING PRICE (USD) *</label><input id="editPrice" type="number" min="0.01" step=".01" required></div>
+    <div class="field"><label for="editCondition">PHYSICAL CONDITION *</label><select id="editCondition"><option value="">Not assessed</option><option>As New</option><option>Very Good</option><option>Good</option><option>Acceptable</option><option>Fair</option><option>Unknown — assess manually</option><option>Not Applicable</option></select></div><div class="field"><label for="editPrice">ASKING PRICE (USD) *</label><input id="editPrice" type="number" min="0" step=".01"></div>
     <div class="field"><label for="editMsrp">MSRP / COVER PRICE</label><input id="editMsrp" type="number" min="0" step=".01"></div><div class="field"><label for="editCost">ACQUISITION COST</label><input id="editCost" type="number" min="0" step=".01"></div>
     <div class="field"><label for="editQuantity">QUANTITY ON HAND</label><input id="editQuantity" type="number" min="0" step="1"></div><div class="field"><label for="editStockMode">STOCK TYPE</label><select id="editStockMode"><option value="unique">Unique copy / one-off</option><option value="quantity">Quantity-tracked merchandise</option></select></div>
     <div class="field"><label for="editZone">WAREHOUSE ZONE *</label><select id="editZone" required><option value="">Manager to assign</option><option value="front_special">Front — Special display</option><option value="middle_retail">Middle — Standard retail</option><option value="annex_retail">Annex — Coffee, snacks & gifts</option><option value="rear_restricted">Rear — Restricted review</option></select></div><div class="field"><label for="editLocation">SHELF / BIN LOCATION</label><input id="editLocation" maxlength="200"></div>
@@ -687,14 +687,14 @@ function renderProducts(){
  var q=$("#inventorySearch").value.trim().toLowerCase(),zone=$("#inventoryZone").value,review=$("#inventoryReview").value;
  var rows=inventoryRows.filter(function(p){return (!zone||p.zone===zone)&&(!review||p.review_status===review)&&(!q||[p.id,p.title,p.author,p.isbn,p.location].some(function(v){return String(v||"").toLowerCase().includes(q)}))});
  $("#products").innerHTML=rows.length?rows.map(function(p){
-  var actions="",ready=productReady(p),needsIdentity=/^SCAN PENDING:/i.test(String(p.title||""));
+  var actions="",ready=productReady(p),needsIdentity=!String(p.title||"").trim()||/^SCAN PENDING:/i.test(String(p.title||""));
   actions+='<button class="btn secondary" data-action="edit" data-id="'+esc(p.id)+'">Edit details</button>';
   if(!p.online_published)actions+='<button class="btn" data-action="approve" data-id="'+esc(p.id)+'" '+(!ready?'disabled title="Complete title, condition, price and retail zone in Edit details first"':"")+'>Approve & publish</button>';
   actions+='<button class="btn secondary" data-action="middle" data-id="'+esc(p.id)+'">Move to Middle</button><button class="btn secondary" data-action="rear" data-id="'+esc(p.id)+'">Restrict</button>';
   if(p.status!=="sold")actions+='<button class="btn danger" data-action="sold" data-id="'+esc(p.id)+'">Mark sold</button>';
   var pill=p.review_status==="approved"?"green":p.zone==="rear_restricted"?"red":"gold";
   var priceText=Number(p.price)>0?fmt(p.price):"Needs price",msrpText=Number(p.msrp)>0?fmt(p.msrp):"Not set";
-  return '<tr><td><div class="itemname">'+esc(p.title)+'</div><div class="smallmuted">'+esc(p.author||p.category)+' · '+esc(p.id)+'</div><div class="smallmuted">Qty '+Number(p.quantity||0)+(needsIdentity?' · Barcode scan needs identification':'')+'</div></td><td><strong>'+priceText+'</strong><div class="smallmuted">MSRP '+msrpText+'</div></td><td>'+esc(zoneName(p.zone))+'<div class="smallmuted">'+esc(p.location||"No shelf assigned")+'</div></td><td><span class="pill '+pill+'">'+esc(p.review_status)+'</span><div class="smallmuted">'+(p.online_published?"Published":"Private")+" · "+esc(p.status)+'</div></td><td><div class="actions">'+actions+'</div></td></tr>';
+  return '<tr><td><div class="itemname">'+esc(p.title||"Awaiting manager identification")+'</div><div class="smallmuted">'+esc(p.author||p.category)+' · '+esc(p.id)+'</div><div class="smallmuted">Qty '+Number(p.quantity||0)+(needsIdentity?' · Barcode scan needs identification':'')+'</div></td><td><strong>'+priceText+'</strong><div class="smallmuted">MSRP '+msrpText+'</div></td><td>'+esc(zoneName(p.zone))+'<div class="smallmuted">'+esc(p.location||"No shelf assigned")+'</div></td><td><span class="pill '+pill+'">'+esc(p.review_status)+'</span><div class="smallmuted">'+(p.online_published?"Published":"Private")+" · "+esc(p.status)+'</div></td><td><div class="actions">'+actions+'</div></td></tr>';
  }).join(""):'<tr><td colspan="5" class="emptyrow">No matching records. Try another search, or receive your first item.</td></tr>';
  $("#inventoryFooter").textContent="Showing "+rows.length+" of "+inventoryRows.length+" inventory records.";
 }
@@ -747,15 +747,22 @@ function parseBarcodeBatch(text){
  var lines=String(text||"").replace(/^\uFEFF/,"").split(/\r?\n/).filter(function(x){return x.trim()});
  if(!lines.length)return [];
  var delim=lines[0].indexOf("\t")>=0?"\t":(lines[0].indexOf(";")>=0?";":",");
- var first=splitImportLine(lines[0],delim),headerIndex=-1;
- first.forEach(function(cell,i){if(headerIndex<0&&/(barcode|isbn|upc|ean|item.?code|product.?code)/i.test(cell))headerIndex=i;});
+ var first=splitImportLine(lines[0],delim),headerIndex=-1,quantityIndex=-1;
+ first.forEach(function(cell,i){
+  if(headerIndex<0&&/(barcode|isbn|upc|ean|item.?code|product.?code)/i.test(cell))headerIndex=i;
+  if(quantityIndex<0&&/(qty|quantity|count)/i.test(cell.trim()))quantityIndex=i;
+ });
  var start=headerIndex>=0?1:0,codes=[];
  for(var r=start;r<lines.length;r++){
   var cells=splitImportLine(lines[r],delim),candidate="";
   if(headerIndex>=0&&cells[headerIndex])candidate=isBarcodeToken(cells[headerIndex]);
   if(!candidate){for(var j=0;j<cells.length;j++){candidate=isBarcodeToken(cells[j]);if(candidate)break;}}
   if(!candidate)candidate=isBarcodeToken(lines[r]);
-  if(candidate)codes.push(candidate);
+  if(candidate){
+   var copies=1;
+   if(quantityIndex>=0&&cells[quantityIndex]!==undefined){var q=parseInt(String(cells[quantityIndex]).replace(/[^0-9]/g,""),10);if(Number.isFinite(q)&&q>1)copies=Math.min(q,200);}
+   for(var copy=0;copy<copies;copy++)codes.push(candidate);
+  }
  }
  return codes;
 }
@@ -777,10 +784,33 @@ function queueCurrentBulkCode(){
 $("#bulkBarcodeInput").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();queueCurrentBulkCode();}});
 $("#bulkQueueCurrentButton").addEventListener("click",queueCurrentBulkCode);
 $("#bulkFocusScannerButton").addEventListener("click",function(){$("#bulkBarcodeInput").focus()});
+var eyoyoSpreadsheetLoader=null;
+function ensureSpreadsheetReader(){
+ if(window.XLSX)return Promise.resolve(window.XLSX);
+ if(!eyoyoSpreadsheetLoader)eyoyoSpreadsheetLoader=new Promise(function(resolve,reject){
+  var script=document.createElement("script");
+  script.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+  script.onload=function(){if(window.XLSX)resolve(window.XLSX);else reject(new Error("Spreadsheet reader did not initialize."));};
+  script.onerror=function(){reject(new Error("Could not load the spreadsheet reader. Save/export the Eyoyo file as CSV or TXT and import it again."));};
+  document.head.appendChild(script);
+ });
+ return eyoyoSpreadsheetLoader;
+}
+async function readEyoyoBarcodeFile(file){
+ var name=String(file.name||"").toLowerCase();
+ if(/\.xlsx?$/.test(name)){
+  var xlsx=await ensureSpreadsheetReader(),bytes=await file.arrayBuffer();
+  var workbook=xlsx.read(bytes,{type:"array",cellDates:false});
+  var sheet=workbook.Sheets[workbook.SheetNames[0]];
+  if(!sheet)throw new Error("The spreadsheet has no readable worksheet.");
+  return parseBarcodeBatch(xlsx.utils.sheet_to_csv(sheet,{FS:","}));
+ }
+ return parseBarcodeBatch(await file.text());
+}
 $("#bulkBarcodeFile").addEventListener("change",async function(){
  var file=this.files&&this.files[0];if(!file)return;
- try{var text=await file.text(),codes=parseBarcodeBatch(text);addBulkCodes(codes,file.name);}
- catch(err){setBulkStatus("Could not read this file. Try exporting it as TXT, CSV or TSV.","error");}
+ try{var codes=await readEyoyoBarcodeFile(file);addBulkCodes(codes,file.name);}
+ catch(err){setBulkStatus("Could not read this file. "+err.message,"error");}
  finally{this.value=""}
 });
 $("#bulkAddPastedButton").addEventListener("click",function(){var codes=parseBarcodeBatch($("#bulkPasteText").value);var n=addBulkCodes(codes,"pasted list");if(n)$("#bulkPasteText").value="";});
@@ -810,7 +840,7 @@ async function lookupBulkQueue(){
 $("#bulkLookupButton").addEventListener("click",lookupBulkQueue);
 function buildBulkRecord(item){
  var book=item.book||null,found=Boolean(book&&book.found),barcode=item.barcode;
- var title=found?[book.title,book.subtitle].filter(Boolean).join(": "):"SCAN PENDING: "+barcode;
+ var title=found?[book.title,book.subtitle].filter(Boolean).join(": "):"";
  return {title:title,author:found?(book.author||""):"",isbn:barcode,category:found?"Book":((barcode.length===10||barcode.length===13)?"Book":"Other"),
   description:found?(book.description||""):"",condition:"",price:"",msrp:"",cost:"",cpv:"",tpv:"",
   zone:"rear_restricted",location:"",quantity:1,stock_mode:"unique",valuation_basis:"none",valuation_confidence:"low",
@@ -962,6 +992,7 @@ $("#resetForm").addEventListener("click",function(){
 $("#itemForm").addEventListener("submit",async function(e){
  e.preventDefault();
  var v=function(id){return $("#"+id).value},code=cleanScanCode(v("isbn"));
+ if(!String(v("title")||"").trim()&&!String(v("isbn")||"").trim()){notice("Scan a barcode or enter an item title before saving.",true);$("#isbn").focus();return;}
  var duplicates=scanState.duplicates;
  if(duplicates.length&&code&&code===scanState.lastLookupBarcode){
   var list=duplicates.slice(0,4).map(function(x){return x.title+" ("+x.id+")"}).join("\n");
