@@ -732,6 +732,7 @@ $("#isbn").addEventListener("keydown",function(e){
 $("#resetForm").addEventListener("click",function(){
  scanState.lastLookupBarcode="";scanState.duplicates=[];scanState.metadataMatched=false;
  $("#condition").value="Unknown — assess manually";$("#valuationBasis").value="none";$("#valuationConfidence").value="low";
+ $("#scanResearchPrices").checked=!$("#scanResearchPrices").disabled&&localStorage.getItem("onecopy_auto_price_research")==="1";
  setScanStatus("");setTimeout(function(){$("#isbn").focus()},20);
 });
 $("#itemForm").addEventListener("submit",async function(e){
