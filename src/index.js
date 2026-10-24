@@ -696,7 +696,7 @@ async function api(req,env,url){
    const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);
    const barcode=cleanBarcode(b.barcode);if(barcode.length<8||barcode.length>14)return json({error:"Scan an ISBN or barcode of 8–14 digits."},400);
    const book=await lookupBookByBarcode(barcode,env);
-   const duplicateRows=await env.DB.prepare("SELECT id,title,author,isbn,condition,price,zone,location,created_at FROM products WHERE isbn=? OR isbn LIKE ? ORDER BY created_at DESC LIMIT 12").bind(barcode,"%"+barcode+"%").all();
+   const duplicateRows=await env.DB.prepare("SELECT id,title,author,isbn,condition,price,zone,location,created_at FROM products WHERE REPLACE(REPLACE(UPPER(isbn),'-',''),' ','')=? OR isbn LIKE ? ORDER BY created_at DESC LIMIT 12").bind(barcode,"%"+barcode+"%").all();
    let pricing=null;
    if(b.researchPrices&&env.OPENAI_API_KEY&&book.found)pricing=await researchScannedBookPrice(book,env);
    else if(b.researchPrices&&!env.OPENAI_API_KEY)pricing={ok:false,error:"AI price research is not configured. Add OPENAI_API_KEY in Cloudflare to enable this optional, potentially billable feature."};
