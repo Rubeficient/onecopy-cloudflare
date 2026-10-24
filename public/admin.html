@@ -920,7 +920,7 @@ function applyScanPricing(pricing){
 function renderScanHistory(){
  $("#scanSessionCount").textContent=scanState.totalSaved+" saved";
  $("#scanSessionRows").innerHTML=scanState.history.length?scanState.history.slice().reverse().map(function(x){
-  return '<div class="scan-history-item"><span><strong>'+esc(x.title)+'</strong><small>'+esc(x.isbn||"No barcode")+' · '+esc(x.zone)+' · '+esc(x.when)+'</small></span><span class="pill">'+esc(x.id)+'</span></div>';
+  return '<div class="scan-history-item"><span><strong>'+esc(x.title||"Awaiting manager identification")+'</strong><small>'+esc(x.isbn||"No barcode")+' · '+esc(x.zone||"Unassigned")+' · '+esc(x.when)+'</small></span><span class="pill">'+esc(x.id)+'</span></div>';
  }).join(""):'<p class="fieldnote">Saved items will appear here. Use “Save & scan next” to keep receiving without switching views.</p>';
 }
 async function loadScanSettings(){
@@ -1007,9 +1007,9 @@ $("#itemForm").addEventListener("submit",async function(e){
   scanState.totalSaved++;scanState.history.push({id:result.id,title:body.title,isbn:body.isbn,zone:body.zone,when:new Date().toLocaleTimeString()});
   if(scanState.history.length>30)scanState.history.shift();renderScanHistory();
   $("#itemForm").reset();$("#scanResearchPrices").checked=retainResearch;
-  ["price","msrp","cost","tpv","cpv"].forEach(function(id){$("#"+id).value="0"});
-  $("#quantity").value="1";$("#zone").value="middle_retail";$("#location").value=retainLocation;
-  $("#condition").value="Unknown — assess manually";$("#valuationBasis").value="none";$("#valuationConfidence").value="low";
+  ["price","msrp","cost","tpv","cpv"].forEach(function(id){$("#"+id).value=""});
+  $("#quantity").value="1";$("#zone").value="";$("#location").value=retainLocation;
+  $("#condition").value="";$("#valuationBasis").value="none";$("#valuationConfidence").value="low";
   $("#stockMode").value="unique";$("#category").value="Book";
   scanState.lastLookupBarcode="";scanState.duplicates=[];scanState.metadataMatched=false;
   setScanStatus("");notice("Saved "+result.id+". Record remains private until reviewed.");
