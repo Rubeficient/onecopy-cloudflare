@@ -645,7 +645,7 @@ $("#useMsrp").addEventListener("click",function(){
  var eligible=$("#category").value==="Book"&&$("#condition").value==="As New"&&$("#zone").value==="middle_retail"&&!exempt;
  if(msrp<=0){notice("Enter a verified MSRP / cover price first. If it is unknown, do not guess.",true);return}
  if(!eligible){notice("MSRP is only the routine starting point for an ordinary As New book in Middle retail with no special flags. Keep this item for review or price it using evidence.",true);return}
- $("#price").value=msrp.toFixed(2);notice("Asking price set to the verified MSRP starting point. You can still adjust it deliberately.");
+ $("#price").value=msrp.toFixed(2);if($("#priceSource"))$("#priceSource").value="msrp";notice("Asking price set to the verified MSRP starting point. You can still adjust it deliberately.");
 });
 ["signed","firstEdition","special"].forEach(function(id){$("#"+id).addEventListener("change",function(){if(this.checked)notice("Exception flagged. Route for partner review; do not rely on routine MSRP pricing.")})});
 
