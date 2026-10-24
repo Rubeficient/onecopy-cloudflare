@@ -659,6 +659,7 @@ function applyScanPricing(pricing){
  $("#valuationBasis").value=p.valuationBasis==="sold_comps"?"sold_comps":p.valuationBasis==="catalog"?"catalog":"none";
  $("#valuationConfidence").value=p.valuationConfidence||"low";
  $("#marketComps").value=evidence.map(function(x){return [x.status,x.title,x.price===null?"price unknown":x.currency+" "+x.price,x.date,x.condition,x.url,x.comparability].filter(Boolean).join(" | ")}).join("\n");
+ if(p.estimatedLow!==null||p.estimatedHigh!==null)$("#notes").value+="\nAI researched value range (verify edition/condition): "+(p.estimatedLow===null?"unknown":p.estimatedLow)+"–"+(p.estimatedHigh===null?"unknown":p.estimatedHigh)+". ";
  if(p.notes)$("#notes").value+="\nAI price research: "+p.notes;
  return true;
 }
@@ -715,7 +716,7 @@ async function lookupBarcode(force){
    setScanStatus($("#scanLookupStatus").textContent+" Existing copies: "+summary+(scanState.duplicates.length>5?"; plus "+(scanState.duplicates.length-5)+" more.":""),"error");
   }
   return data;
- }catch(err){setScanStatus("Lookup failed: "+err.message+". You can enter details manually and continue.","error");return null}
+ }catch(err){if(scanState.lastLookupBarcode===barcode)scanState.lastLookupBarcode="";setScanStatus("Lookup failed: "+err.message+". Retry with the lookup button or enter details manually.","error");return null}
  finally{scanState.inFlightBarcode="";button.disabled=false;button.textContent="Look up scan ↗"}
 }
 $("#lookupBarcode").addEventListener("click",function(){lookupBarcode(true)});
