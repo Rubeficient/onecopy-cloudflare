@@ -90,9 +90,9 @@
   <div class="field"><label for="bulkPasteText">OR PASTE A LIST OF BARCODES</label><textarea id="bulkPasteText" rows="3" placeholder="One barcode per line, or paste the Eyoyo keyboard export here"></textarea><button class="btn secondary" id="bulkAddPastedButton" type="button">Add pasted codes to queue</button><span class="fieldnote">Inventory exports with a Barcode/ISBN and Qty/Count column expand into one draft per physical copy. Batches are limited to 200 items.</span></div>
  </div>
  <div id="bulkScanStatus" class="message hidden" role="status" aria-live="polite"></div>
- <div class="bulk-queue-summary"><strong id="bulkQueueCount">0 scanned</strong><span id="bulkQueueSummary">No batch items yet.</span></div>
+ <div class="bulk-throttle-controls"><div class="field"><label for="bulkChunkSize">ITEMS PER LOOKUP BATCH</label><select id="bulkChunkSize"><option value="15">15</option><option value="20" selected>20</option><option value="25">25</option></select></div><div class="field"><label for="bulkPauseMs">PAUSE BETWEEN LOOKUPS</label><select id="bulkPauseMs"><option value="500">0.5 second</option><option value="1000" selected>1 second</option><option value="1500">1.5 seconds</option></select></div><p class="fieldnote">One item at a time. OneCopy waits asynchronously between lookups and pauses 2 seconds between batches. These pauses reduce request bursts; they do not increase the provider's published quota.</p></div><div class="bulk-queue-summary"><strong id="bulkQueueCount">0 scanned</strong><span id="bulkQueueSummary">No batch items yet.</span></div>
  <div id="bulkQueueRows" class="bulk-queue-rows"><p class="fieldnote">Each scan becomes a separate item. Repeated ISBNs are kept as separate copies, but OneCopy will flag them for confirmation.</p></div>
- <div class="btnline bulk-actions"><button class="btn secondary" id="bulkLookupButton" type="button" disabled>Look up metadata</button><button class="btn" id="bulkSaveButton" type="button" disabled>Save all as private drafts →</button><button class="btn secondary" id="bulkClearButton" type="button">Clear batch</button><button class="btn text-button" id="bulkFocusScannerButton" type="button">Focus scanner input</button></div>
+ <div class="btnline bulk-actions"><button class="btn secondary" id="bulkLookupButton" type="button" disabled>Look up metadata in paced batches</button><button class="btn" id="bulkSaveButton" type="button" disabled>Save all as private drafts →</button><button class="btn secondary" id="bulkClearButton" type="button">Clear batch</button><button class="btn text-button" id="bulkFocusScannerButton" type="button">Focus scanner input</button></div>
 </section>
 <form id="itemForm"><div class="formgrid">
 <div class="field wide scan-field"><label for="isbn">SCAN ISBN / UPC / BARCODE FIRST</label><div class="scan-row"><input id="isbn" maxlength="40" autocomplete="off" inputmode="numeric" placeholder="Scan a book ISBN barcode" aria-describedby="scanHint"><button class="btn secondary" id="lookupBarcode" type="button">Look up scan ↗</button></div><span id="scanHint" class="fieldnote">A USB scanner can type here like a keyboard. Lookups start automatically after a barcode is entered.</span><div id="scanLookupStatus" class="message hidden" role="status" aria-live="polite"></div><input id="metadataSource" type="hidden"><input id="metadataConfidence" type="hidden"><input id="metadataNotes" type="hidden"></div>
@@ -102,8 +102,8 @@
 <div class="field"><label for="format">FORMAT</label><select id="format"><option value="">Unknown</option><option>Hardcover</option><option>Paperback</option><option>Mass market paperback</option><option>Large print</option><option>Spiral bound</option><option>Audio</option><option>eBook</option><option>Book</option><option>Other</option></select></div><div class="field"><label for="language">LANGUAGE</label><input id="language" maxlength="100" placeholder="Language"></div>
 <div class="field wide"><label for="subjects">SUBJECTS / CATEGORIES</label><input id="subjects" maxlength="1500" placeholder="Subjects or catalog categories"></div>
 <div class="field"><label for="category">DEPARTMENT</label><select id="category"><option>Book</option><option>Clothing</option><option>Jewelry</option><option>Antique / Collectible</option><option>Home decor</option><option>Gift</option><option>Snack</option><option>Beverage</option><option>Coffee</option><option>Game</option><option>Stationery</option><option>Other</option></select></div>
-<div class="field"><label for="price">ASKING PRICE (USD)</label><input id="price" type="number" min="0" step=".01" placeholder="Set during manager review"><span class="fieldnote">The actual price you intend to charge. MSRP is a reference anchor—not a market appraisal.</span></div><div class="field"><label for="msrp">MSRP / COVER PRICE (USD)</label><input id="msrp" type="number" min="0" step=".01" placeholder="Only if verified"><button class="btn secondary price-action" id="useMsrp" type="button">Use MSRP as asking price</button><span class="fieldnote">Only enter a verified printed cover price; digital retail prices are not print MSRP.</span></div>
-<div class="field wide scan-research"><label for="scanResearchPrices"><input id="scanResearchPrices" type="checkbox"> Add AI web research for price, MSRP and sold comparables during scans</label><span class="fieldnote">Optional. Each scan can trigger a web-research API call and may incur charges. It only fills values when evidence is found; it is not an appraisal.</span><span id="scanResearchHint" class="fieldnote">Bibliographic lookups do not require the AI pricing feature.</span></div>
+<div class="field"><label for="price">REGULAR ASKING PRICE (USD)</label><input id="price" type="number" min="0" step=".01" placeholder="Select from the price matrix during manager review"><span class="fieldnote">The selected default price for the item’s regular listing. Alternative price options remain saved.</span></div><div class="field"><label for="msrp">MSRP / COVER PRICE (USD)</label><input id="msrp" type="number" min="0" step=".01" placeholder="Only if verified"><button class="btn secondary price-action" id="useMsrp" type="button">Use MSRP as asking price</button><span class="fieldnote">Only enter a verified printed cover price; digital retail prices are not print MSRP.</span></div>
+<div class="field wide scan-research"><label for="scanResearchPrices"><input id="scanResearchPrices" type="checkbox"> Use optional OpenAI API web research for price, MSRP and sold comparables during scans</label><span class="fieldnote">Optional and potentially billable per scan. Gemini free-tier photo cataloging does not include live web-grounded sales research. Leave this off for free-first intake.</span><span id="scanResearchHint" class="fieldnote">Bibliographic lookups do not require the AI pricing feature.</span></div>
 <div class="field"><label for="cost">ACQUISITION COST (USD)</label><input id="cost" type="number" min="0" step=".01" placeholder="Manager to enter"></div><div class="field"><label for="condition">CONDITION</label><select id="condition"><option value="" selected>Not assessed — manager to complete</option><option>As New</option><option>Very Good</option><option>Good</option><option>Acceptable</option><option>Fair</option><option>Unknown — assess manually</option><option>Not Applicable</option></select></div><div class="flagrow"><label><input id="signed" type="checkbox"> Signed / inscribed</label><label><input id="firstEdition" type="checkbox"> First edition / printing</label><label><input id="special" type="checkbox"> Special / unusual copy</label><span class="fieldnote">Any checked flag means: pause ordinary MSRP pricing and request partner review.</span></div>
 <div class="field"><label for="zone">WAREHOUSE ZONE</label><select id="zone"><option value="" selected>Manager to assign zone</option><option value="middle_retail">Middle — Standard retail</option><option value="front_special">Front — Special display</option><option value="annex_retail">Annex — Coffee, snacks & gifts</option><option value="rear_restricted">Rear — Restricted review</option></select></div><div class="field"><label for="location">SHELF / BIN LOCATION</label><input id="location" placeholder="e.g. M-03, Annex-Gift-1"></div>
 <div class="field"><label for="quantity">QUANTITY ON HAND</label><input id="quantity" type="number" min="0" max="100000" value="1"></div><div class="field"><label for="stockMode">STOCK TYPE</label><select id="stockMode"><option value="unique">Unique copy / one-off</option><option value="quantity">Quantity-tracked merchandise</option></select></div>
@@ -319,7 +319,7 @@
     <div class="field"><label for="editEdition">EDITION / PRINTING NOTES</label><input id="editEdition" maxlength="500"></div><div class="field"><label for="editPages">PAGE COUNT</label><input id="editPages" type="number" min="0" step="1"></div>
     <div class="field"><label for="editFormat">FORMAT</label><input id="editFormat" maxlength="150" placeholder="Hardcover, paperback…"></div><div class="field"><label for="editLanguage">LANGUAGE</label><input id="editLanguage" maxlength="100"></div>
     <div class="field wide"><label for="editSubjects">SUBJECTS / CATEGORIES</label><input id="editSubjects" maxlength="1500"></div>
-    <div class="field"><label for="editCondition">PHYSICAL CONDITION *</label><select id="editCondition"><option value="">Not assessed</option><option>As New</option><option>Very Good</option><option>Good</option><option>Acceptable</option><option>Fair</option><option>Unknown — assess manually</option><option>Not Applicable</option></select></div><div class="field"><label for="editPrice">ASKING PRICE (USD) *</label><input id="editPrice" type="number" min="0" step=".01"></div>
+    <div class="field"><label for="editCondition">PHYSICAL CONDITION *</label><select id="editCondition"><option value="">Not assessed</option><option>As New</option><option>Very Good</option><option>Good</option><option>Acceptable</option><option>Fair</option><option>Unknown — assess manually</option><option>Not Applicable</option></select></div><div class="field"><label for="editPrice">REGULAR ASKING PRICE (USD) *</label><input id="editPrice" type="number" min="0" step=".01"></div>
     <div class="field"><label for="editMsrp">MSRP / COVER PRICE</label><input id="editMsrp" type="number" min="0" step=".01"></div><div class="field"><label for="editCost">ACQUISITION COST</label><input id="editCost" type="number" min="0" step=".01"></div>
     <div class="field"><label for="editQuantity">QUANTITY ON HAND</label><input id="editQuantity" type="number" min="0" step="1"></div><div class="field"><label for="editStockMode">STOCK TYPE</label><select id="editStockMode"><option value="unique">Unique copy / one-off</option><option value="quantity">Quantity-tracked merchandise</option></select></div>
     <div class="field"><label for="editZone">WAREHOUSE ZONE *</label><select id="editZone" required><option value="">Manager to assign</option><option value="front_special">Front — Special display</option><option value="middle_retail">Middle — Standard retail</option><option value="annex_retail">Annex — Coffee, snacks & gifts</option><option value="rear_restricted">Rear — Restricted review</option></select></div><div class="field"><label for="editLocation">SHELF / BIN LOCATION</label><input id="editLocation" maxlength="200"></div>
@@ -374,8 +374,8 @@ async function loadCaptureStatus(){
  try{
   var d=await api("/api/admin/item-capture/status");
   var el=$("#captureConfigNotice");
-  if(d.configured){el.className="capture-config good";el.textContent="AI capture is configured ("+esc(d.model)+"). Analysis can search for visible reference listings; every identification and price still needs human verification."}
-  else{el.className="capture-config bad";el.textContent="Setup needed: add OPENAI_API_KEY as a Worker secret in Cloudflare to enable AI image analysis. This is an API key with separate usage billing; your ChatGPT subscription is not an API key. Photos stay in the browser except when sent securely for analysis."}
+  if(d.configured){el.className="capture-config good";el.textContent=(d.provider==="gemini"?"Gemini AI capture is configured ("+esc(d.model)+"). Free-tier quotas depend on the model and project; this mode reads visible details but does not run live market searches.":"OpenAI API capture is configured ("+esc(d.model)+"). Web research may be available and usage is billed separately from ChatGPT. In all cases, verify identification and price claims.")}
+  else{el.className="capture-config bad";el.textContent="Setup needed: add GEMINI_API_KEY as a Cloudflare Worker secret for the free-tier Gemini capture path. Alternatively, OPENAI_API_KEY enables the separate OpenAI API path. A ChatGPT subscription is not an API key. Photos are sent securely only when you request analysis."}
   captureStatusLoaded=true;
  }catch(e){$("#captureConfigNotice").className="capture-config";$("#captureConfigNotice").textContent="Could not check AI configuration. Sign in again, then reopen AI Item Capture."}
 }
@@ -674,7 +674,7 @@ document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!$("#produc
 $("#productEditForm").addEventListener("submit",async function(e){
  e.preventDefault();if(!editingProductId)return;
  var v=function(id){return $("#"+id).value},button=$("#editSaveButton");button.disabled=true;button.textContent="Saving details…";
- var body={title:v("editTitle"),author:v("editAuthor"),isbn:v("editIsbn"),category:v("editCategory"),publisher:v("editPublisher"),publication_year:v("editYear"),edition:v("editEdition"),page_count:Number(v("editPages")),format:v("editFormat"),language:v("editLanguage"),subjects:v("editSubjects"),condition:v("editCondition"),price:Number(v("editPrice")),msrp:Number(v("editMsrp")),cost:Number(v("editCost")),quantity:Number(v("editQuantity")),stock_mode:v("editStockMode"),zone:v("editZone"),location:v("editLocation"),cpv:Number(v("editCpv")),tpv:Number(v("editTpv")),valuation_basis:v("editBasis"),valuation_confidence:v("editConfidence"),image_url:v("editImage"),description:v("editDescription"),market_comps:v("editMarketComps"),notes:v("editNotes"),signed:$("#editSigned").checked,first_edition:$("#editFirstEdition").checked,special:$("#editSpecial").checked,review_status:"needs_partner_review",online_published:false};
+ var body={title:v("editTitle"),author:v("editAuthor"),isbn:v("editIsbn"),category:v("editCategory"),publisher:v("editPublisher"),publication_year:v("editYear"),edition:v("editEdition"),page_count:Number(v("editPages")),format:v("editFormat"),language:v("editLanguage"),subjects:v("editSubjects"),condition:v("editCondition"),price:Number(v("editPrice")),msrp:Number(v("editMsrp")),cost:Number(v("editCost")),quantity:Number(v("editQuantity")),stock_mode:v("editStockMode"),zone:v("editZone"),location:v("editLocation"),cpv:Number(v("editCpv")),tpv:Number(v("editTpv")),valuation_basis:v("editBasis"),valuation_confidence:v("editConfidence"),image_url:v("editImage"),description:v("editDescription"),market_comps:v("editMarketComps"),notes:v("editNotes"),signed:$("#editSigned").checked,first_edition:$("#editFirstEdition").checked,special:$("#editSpecial").checked,pricing_matrix:window.buildOneCopyPriceMatrix("edit"),review_status:"needs_partner_review",online_published:false};
  try{await api("/api/admin/products/"+encodeURIComponent(editingProductId),{method:"PATCH",body:JSON.stringify(body)});closeProductEditor();notice("Item details saved. The record remains private until the manager approves it.");await loadProducts();}
  catch(err){notice(err.message,true)}
  finally{button.disabled=false;button.textContent="Save as private review draft →"}
@@ -819,23 +819,35 @@ $("#bulkClearButton").addEventListener("click",function(){if(bulkQueue.length&&!
 async function lookupBulkQueue(){
  if(bulkLookingUp||!bulkQueue.length)return;
  bulkLookingUp=true;renderBulkQueue();
- var pending=bulkQueue.filter(function(x){return x.state==="queued"||x.state==="error"}),cursor=0,finished=0,cache=new Map();
- setBulkStatus("Looking up metadata for "+pending.length+" scan(s). This can take a little while for a large batch.");
- async function runner(){
-  while(cursor<pending.length){
-   var item=pending[cursor++];item.state="looking";renderBulkQueue();
+ var pending=bulkQueue.filter(function(x){return x.state==="queued"||x.state==="error"}),finished=0,cache=new Map();
+ var batchSize=Math.max(15,Math.min(25,Number($("#bulkChunkSize").value)||20));
+ var pauseMs=Math.max(0,Math.min(5000,Number($("#bulkPauseMs").value)||1000));
+ var wait=function(ms){return new Promise(function(resolve){setTimeout(resolve,ms)});};
+ if(!pending.length){bulkLookingUp=false;renderBulkQueue();setBulkStatus("All queued scans already have a lookup result.");return;}
+ setBulkStatus("Looking up "+pending.length+" pending scan(s) sequentially in chunks of "+batchSize+". Waiting "+(pauseMs/1000)+" second(s) between requests, plus 2 seconds between chunks.");
+ try{
+  for(var i=0;i<pending.length;i++){
+   var item=pending[i];item.state="looking";renderBulkQueue();
    try{
     var data;
     if(cache.has(item.barcode))data=cache.get(item.barcode);
     else{data=await api("/api/admin/catalog/lookup",{method:"POST",body:JSON.stringify({barcode:item.barcode,researchPrices:false})});cache.set(item.barcode,data);}
-    item.book=data.book&&data.book.found?data.book:null;item.duplicates=Array.isArray(data.duplicates)?data.duplicates:[];
-    item.state=item.book?"matched":"missing";item.error=item.book?"":(data.book&&data.book.reason||"No exact catalog match.");
+    item.book=data.book&&data.book.found?data.book:null;
+    item.duplicates=Array.isArray(data.duplicates)?data.duplicates:[];
+    item.state=item.book?"matched":"missing";
+    item.error=item.book?"":(data.book&&data.book.reason||"No exact catalog match.");
    }catch(err){item.state="error";item.error=err.message||"Lookup failed";}
-   finished++;renderBulkQueue();setBulkStatus("Metadata lookup complete for "+finished+" of "+pending.length+" scan(s).");
+   finished++;renderBulkQueue();
+   setBulkStatus("Metadata lookup "+finished+" of "+pending.length+" in this run. "+bulkQueue.filter(function(x){return x.state==="matched"}).length+" matched so far.");
+   if(finished<pending.length){
+    if(finished%batchSize===0){setBulkStatus("Finished chunk of "+batchSize+". Pausing 2 seconds before the next chunk.");await wait(2000);}
+    else await wait(pauseMs);
+   }
   }
+ }finally{
+  bulkLookingUp=false;renderBulkQueue();
+  setBulkStatus("Lookup run finished. "+bulkQueue.filter(function(x){return x.state==="matched"}).length+" matched; "+bulkQueue.filter(function(x){return x.state==="missing"||x.state==="error"}).length+" need manager identification or another lookup.",bulkQueue.some(function(x){return x.state==="error"||x.state==="missing"})?"error":"");
  }
- try{await Promise.all(Array.from({length:Math.min(3,pending.length)},runner));}
- finally{bulkLookingUp=false;renderBulkQueue();setBulkStatus("Lookup finished. "+bulkQueue.filter(function(x){return x.state==="matched"}).length+" matched; "+bulkQueue.filter(function(x){return x.state==="missing"||x.state==="error"}).length+" need manager identification or another lookup.",bulkQueue.some(function(x){return x.state==="error"||x.state==="missing"})?"error":"");}
 }
 $("#bulkLookupButton").addEventListener("click",lookupBulkQueue);
 function buildBulkRecord(item){
@@ -900,6 +912,7 @@ function fillScanMetadata(book,barcode){
  $("#marketComps").value="";$("#image").value=book.imageUrl||"";
  $("#description").value=book.description||"";
  $("#metadataSource").value=book.source||"";$("#metadataConfidence").value=book.confidence||"low";$("#metadataNotes").value=book.metadataNote||"";
+ if(window.hydrateOneCopyPriceMatrix)window.hydrateOneCopyPriceMatrix("",null);
  $("#zone").value="";$("#location").value="";$("#notes").value="";
  scanState.metadataMatched=true;
 }
@@ -998,7 +1011,7 @@ $("#itemForm").addEventListener("submit",async function(e){
   var list=duplicates.slice(0,4).map(function(x){return x.title+" ("+x.id+")"}).join("\n");
   if(!window.confirm("OneCopy already contains "+duplicates.length+" item record(s) with this barcode:\n"+list+"\n\nMultiple physical copies can share an ISBN. Save this as another copy only if you have the physical book in hand and intend to create a separate record."))return;
  }
- var body={title:v("title"),author:v("author"),isbn:v("isbn"),category:v("category"),price:Number(v("price")),msrp:Number(v("msrp")),cost:Number(v("cost")),condition:v("condition"),zone:v("zone"),location:v("location"),quantity:Number(v("quantity")),stock_mode:v("stockMode"),tpv:Number(v("tpv")),cpv:Number(v("cpv")),market_comps:v("marketComps"),valuation_basis:v("valuationBasis"),valuation_confidence:v("valuationConfidence"),signed:$("#signed").checked,first_edition:$("#firstEdition").checked,special:$("#special").checked,image_url:v("image"),description:v("description"),notes:v("notes"),edition:v("edition"),publisher:v("publisher"),publication_year:v("publicationYear"),page_count:Number(v("pageCount")),format:v("format"),language:v("language"),subjects:v("subjects"),metadata_source:v("metadataSource"),metadata_confidence:v("metadataConfidence"),metadata_notes:v("metadataNotes"),review_status:"needs_partner_review",online_published:false};
+ var body={title:v("title"),author:v("author"),isbn:v("isbn"),category:v("category"),price:Number(v("price")),msrp:Number(v("msrp")),cost:Number(v("cost")),condition:v("condition"),zone:v("zone"),location:v("location"),quantity:Number(v("quantity")),stock_mode:v("stockMode"),tpv:Number(v("tpv")),cpv:Number(v("cpv")),market_comps:v("marketComps"),valuation_basis:v("valuationBasis"),valuation_confidence:v("valuationConfidence"),signed:$("#signed").checked,first_edition:$("#firstEdition").checked,special:$("#special").checked,image_url:v("image"),description:v("description"),notes:v("notes"),edition:v("edition"),publisher:v("publisher"),publication_year:v("publicationYear"),page_count:Number(v("pageCount")),format:v("format"),language:v("language"),subjects:v("subjects"),metadata_source:v("metadataSource"),metadata_confidence:v("metadataConfidence"),metadata_notes:v("metadataNotes"),pricing_matrix:window.buildOneCopyPriceMatrix(""),review_status:"needs_partner_review",online_published:false};
  var submitter=e.submitter||$("#saveItemButton"),mode=submitter.dataset.mode||"next";
  var saveBtn=$("#saveItemButton"),finishBtn=$("#saveFinishButton"),retainLocation=$("#location").value,retainResearch=$("#scanResearchPrices").checked;
  saveBtn.disabled=true;finishBtn.disabled=true;saveBtn.textContent="Saving item…";
@@ -1427,4 +1440,4 @@ $("#ebayListings").addEventListener("click",async function(e){
  catch(err){notice(err.message,true);btn.disabled=false;btn.textContent="Withdraw listing"}
 });
 
-</script><script src="/admin-polish.js"></script></body></html>
+</script><script src="/price-matrix.js"></script><script src="/admin-polish.js"></script></body></html>
