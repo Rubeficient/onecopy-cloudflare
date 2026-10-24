@@ -428,7 +428,7 @@ function normal(body){
  const confidence=["low","medium","high"].includes(body.valuation_confidence)?body.valuation_confidence:"low";
  const basis=["none","sold_comps","catalog","internal_sales","appraisal","partner_judgment"].includes(body.valuation_basis)?body.valuation_basis:"none";
  const extra={cost:m(body.cost),cpv:m(body.cpv),tpv:m(body.tpv),edition:s(body.edition,500),publisher:s(body.publisher,500),publication_year:s(body.publication_year,40),page_count:m(body.page_count),format:s(body.format,150),language:s(body.language,100),subjects:s(body.subjects,1500),metadata_source:s(body.metadata_source,120),metadata_confidence:s(body.metadata_confidence,40),metadata_notes:s(body.metadata_notes,1800),signed:Boolean(body.signed),firstEdition:Boolean(body.first_edition ?? body.firstEdition),special:Boolean(body.special),notes:s(body.notes,3000),market_comps:s(body.market_comps,3000),valuation_basis:basis,valuation_confidence:confidence};
- return {title,author:s(body.author,300),isbn:s(body.isbn,40),category:s(body.category||"Book",100),description:s(body.description,5000),condition:s(body.condition||"Good",100),price:m(body.price),msrp:m(body.msrp),stock_mode:body.stock_mode==="quantity"?"quantity":"unique",quantity,status,zone,location:s(body.location,200),review_status:review,online_published:published?1:0,image_url:s(body.image_url,2000),item_json:JSON.stringify(extra)};
+ return {title,author:s(body.author,300),isbn:s(body.isbn,40),category:s(body.category||"Book",100),description:s(body.description,5000),condition:s(body.condition,100),price:m(body.price),msrp:m(body.msrp),stock_mode:body.stock_mode==="quantity"?"quantity":"unique",quantity,status,zone,location:s(body.location,200),review_status:review,online_published:published?1:0,image_url:s(body.image_url,2000),item_json:JSON.stringify(extra)};
 }
 function toAdmin(row){let x={};try{x=JSON.parse(row.item_json||"{}");}catch{}return {...row,...x,item_json:undefined,online_published:Boolean(row.online_published)};}
 
@@ -825,6 +825,23 @@ async function api(req,env,url){
    return json({ok:true,message:"eBay listing withdrawn. The OneCopy inventory record remains intact."});
   }
 
+  if(p==="/api/admin/products/bulk"&&method==="POST"){
+   const b=await read(req);
+   if(!b||!Array.isArray(b.items))return json({error:"Send an items array for bulk intake."},400);
+   if(!b.items.length)return json({error:"The bulk intake queue is empty."},400);
+   if(b.items.length>200)return json({error:"Save at most 200 scanned items per batch."},413);
+   const now=new Date().toISOString(),items=[],statements=[];
+   for(const entry of b.items){
+    const body=Object.assign({},entry,{review_status:"needs_partner_review",online_published:false,status:"in_stock"});
+    const x=normal(body);
+    if(x.error)return json({error:"Bulk item could not be prepared: "+x.error},400);
+    const id="OC-"+crypto.randomUUID().replace(/-/g,"").slice(0,10).toUpperCase();
+    statements.push(env.DB.prepare("INSERT INTO products (id,title,author,isbn,category,description,condition,price,msrp,stock_mode,quantity,status,zone,location,review_status,online_published,image_url,item_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,x.title,x.author,x.isbn,x.category,x.description,x.condition,x.price,x.msrp,x.stock_mode,x.quantity,x.status,x.zone,x.location,x.review_status,x.online_published,x.image_url,x.item_json,now,now));
+    items.push({id,title:x.title,isbn:x.isbn,zone:x.zone});
+   }
+   await env.DB.batch(statements);
+   return json({ok:true,count:items.length,items},201);
+  }
   if(p==="/api/admin/products"&&method==="GET"){const r=await env.DB.prepare("SELECT * FROM products ORDER BY created_at DESC LIMIT 1000").all();return json({products:(r.results||[]).map(toAdmin)});}
   if(p==="/api/admin/products"&&method==="POST"){
    const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);const x=normal(b);if(x.error)return json({error:x.error},400);
@@ -839,6 +856,10 @@ async function api(req,env,url){
    let extra={};try{extra=JSON.parse(old.item_json||"{}");}catch{}
    const merged={...old,...extra,...b};if(b.review_status==="approved"&&!Object.hasOwn(b,"online_published"))merged.online_published=true;
    if(merged.zone==="rear_restricted"||merged.status==="sold"||merged.status==="archived")merged.online_published=false;
+   if((b.review_status==="approved"||b.online_published===true)&&(!s(merged.title,300)||/^SCAN PENDING:/i.test(s(merged.title,300))))return json({error:"Complete the title or item identity before approval."},400);
+   if((b.review_status==="approved"||b.online_published===true)&&(!s(merged.condition,100)||s(merged.condition,100)==="Unknown — assess manually"))return json({error:"Set the physical condition before approval."},400);
+   if((b.review_status==="approved"||b.online_published===true)&&!(m(merged.price)>0))return json({error:"Set a positive asking price before approval."},400);
+   if((b.review_status==="approved"||b.online_published===true)&&(!zones.has(merged.zone)||merged.zone==="rear_restricted"))return json({error:"Assign the item to an approved retail zone before publishing."},400);
    const x=normal(merged);if(x.error)return json({error:x.error},400);const now=new Date().toISOString();
    await env.DB.prepare("UPDATE products SET title=?,author=?,isbn=?,category=?,description=?,condition=?,price=?,msrp=?,stock_mode=?,quantity=?,status=?,zone=?,location=?,review_status=?,online_published=?,image_url=?,item_json=?,updated_at=? WHERE id=?").bind(x.title,x.author,x.isbn,x.category,x.description,x.condition,x.price,x.msrp,x.stock_mode,x.quantity,x.status,x.zone,x.location,x.review_status,x.online_published,x.image_url,x.item_json,now,id).run();
    return json({ok:true,id,online_published:Boolean(x.online_published)});
@@ -861,7 +882,7 @@ export default {async fetch(req,env){
  const url=new URL(req.url);
  try{
   if(url.pathname==="/api/ebay/callback"&&req.method.toUpperCase()==="GET")return await handleEbayCallback(req,env,url);
-  if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.12.0",inventory:"empty by default"});}
+  if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.13.0",inventory:"empty by default"});}
   if(url.pathname==="/admin"||url.pathname==="/admin/")return env.ASSETS.fetch(new Request(new URL("/admin.html",url),{method:"GET"}));
   if(url.pathname.startsWith("/api/"))return await api(req,env,url);
   return env.ASSETS.fetch(req);
