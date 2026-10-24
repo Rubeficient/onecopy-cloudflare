@@ -13,6 +13,17 @@ OneCopy is a simple inventory-backed catalog for Magic Door Books, with the phys
 - **Starts with an empty inventory.** No local catalog import and no demo inventory are required.
 - **Online card checkout and Square are not implemented in this repository yet.** The storefront is currently a catalog preview, not a live store taking payments.
 
+## Scan-to-Shelf receiving (0.12.0)
+
+The Receive Item workflow is now scan-first. Scan or enter an ISBN and OneCopy looks for an exact edition match from Google Books, then Open Library. Exact-match metadata can fill the title, author, publisher, edition publication year, page count, format where available, language, subjects/categories, description and cover image. Book metadata is cached in D1 so scanning another physical copy of an already-seen ISBN avoids repeating external lookup calls. Existing OneCopy records with the barcode are shown before saving; duplicate ISBNs are allowed because a used bookstore can hold multiple physical copies, but the operator must confirm a new copy.
+
+- The scanner field supports keyboard-wedge scanners that type the code and send Enter, plus automatic lookup and a manual lookup button.
+- `Save & scan next` is the primary action. It clears item-specific data, retains the shelf/bin location for batch intake, focuses the barcode field and keeps a short session history on screen.
+- New scans default to an unknown condition, one unique copy, private/unpublished review status, and no invented acquisition cost. Edition years older than 30 years route to the restricted rear zone for partner review; recent editions default to middle retail.
+- Optional AI web research can look for printed cover-price evidence, exact-edition active listings and sold records, and populate draft MSRP/asking-price/CPV/TPV fields when supported. It requires `OPENAI_API_KEY`, may incur API charges per scan, and is off until explicitly enabled. Research is not an appraisal.
+- Barcodes do not encode physical condition, acquisition cost, exact completeness, signatures, first printing, authenticity or shelf location. Those are flagged in staff notes and must be checked before approval. If no exact book match exists, enter the record manually or use AI Item Capture.
+- Open Library requests are used as a fallback rather than the primary source. Respect the provider usage limits; this workflow is for paced intake, not bulk-downloading provider catalogs.
+
 ## Control Room polish (0.11.0)
 
 The Control Room now loads a separate presentation/help layer from `public/admin-polish.css` and `public/admin-polish.js`. Keeping these files separate makes UI polish easier to evolve without coupling it to inventory, pricing or marketplace business logic.
