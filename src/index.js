@@ -422,7 +422,7 @@ async function publishEbayItem(env,productId,titleOverride,submittedAspects){
 const PRICE_MATRIX_LABELS={
  msrp:"MSRP / cover price",suggested_used:"Suggested used price",brick_mortar:"Brick-and-mortar price",
  front_window:"Front-window / pop-culture price",signed:"Signed-copy price",first_edition:"First-edition / first-printing price",
- signed_first:"Signed + first-edition price",arc:"Advance reading copy / proof price",signed_arc:"Signed ARC / proof price",custom:"Custom / other price"
+ signed_first:"Signed + first-edition price",arc:"Advance reading copy / proof price",signed_arc:"Signed ARC / proof price",full_market:"Full-market / standard price",student_access:"Student / community-access price",installment:"Installment / terms total",custom:"Custom / other price"
 };
 function normalizePriceMatrix(value,fallbackMsrp){
  const b=value&&typeof value==="object"?value:{};
