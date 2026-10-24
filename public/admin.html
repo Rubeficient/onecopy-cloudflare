@@ -757,8 +757,8 @@ $("#itemForm").addEventListener("submit",async function(e){
   $("#condition").value="Unknown — assess manually";$("#valuationBasis").value="none";$("#valuationConfidence").value="low";
   $("#stockMode").value="unique";$("#category").value="Book";
   scanState.lastLookupBarcode="";scanState.duplicates=[];scanState.metadataMatched=false;
-  setScanStatus("");await loadProducts();notice("Saved "+result.id+". Record remains private until reviewed.");
-  if(mode==="finish")setView("inventory");else{setView("receive");setTimeout(function(){$("#isbn").focus()},60);}
+  setScanStatus("");notice("Saved "+result.id+". Record remains private until reviewed.");
+  if(mode==="finish"){await loadProducts();setView("inventory");}else{setView("receive");setTimeout(function(){$("#isbn").focus()},60);}
  }catch(err){notice(err.message,true)}
  finally{saveBtn.disabled=false;finishBtn.disabled=false;saveBtn.textContent="Save & scan next →"}
 });
