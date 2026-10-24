@@ -116,6 +116,7 @@ async function ensureSchema(env){
    if(!present.has(name)) await env.DB.prepare("ALTER TABLE "+table+" ADD COLUMN "+name+" "+definition).run();
   }
  }
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS barcode_metadata_cache (barcode TEXT PRIMARY KEY, result_json TEXT NOT NULL, fetched_at TEXT NOT NULL, expires_at TEXT NOT NULL)").run();
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_products_public ON products (online_published, status, category)").run();
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_products_title ON products (title)").run();
  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_products_zone ON products (zone, review_status)").run();
@@ -426,7 +427,7 @@ function normal(body){
  const published=Boolean(body.online_published)&&zone!=="rear_restricted"&&review==="approved"&&status==="in_stock"&&quantity>0;
  const confidence=["low","medium","high"].includes(body.valuation_confidence)?body.valuation_confidence:"low";
  const basis=["none","sold_comps","catalog","internal_sales","appraisal","partner_judgment"].includes(body.valuation_basis)?body.valuation_basis:"none";
- const extra={cost:m(body.cost),cpv:m(body.cpv),tpv:m(body.tpv),edition:s(body.edition,500),signed:Boolean(body.signed),firstEdition:Boolean(body.first_edition ?? body.firstEdition),special:Boolean(body.special),notes:s(body.notes,3000),market_comps:s(body.market_comps,3000),valuation_basis:basis,valuation_confidence:confidence};
+ const extra={cost:m(body.cost),cpv:m(body.cpv),tpv:m(body.tpv),edition:s(body.edition,500),publisher:s(body.publisher,500),publication_year:s(body.publication_year,40),page_count:m(body.page_count),format:s(body.format,150),language:s(body.language,100),subjects:s(body.subjects,1500),metadata_source:s(body.metadata_source,120),metadata_confidence:s(body.metadata_confidence,40),metadata_notes:s(body.metadata_notes,1800),signed:Boolean(body.signed),firstEdition:Boolean(body.first_edition ?? body.firstEdition),special:Boolean(body.special),notes:s(body.notes,3000),market_comps:s(body.market_comps,3000),valuation_basis:basis,valuation_confidence:confidence};
  return {title,author:s(body.author,300),isbn:s(body.isbn,40),category:s(body.category||"Book",100),description:s(body.description,5000),condition:s(body.condition||"Good",100),price:m(body.price),msrp:m(body.msrp),stock_mode:body.stock_mode==="quantity"?"quantity":"unique",quantity,status,zone,location:s(body.location,200),review_status:review,online_published:published?1:0,image_url:s(body.image_url,2000),item_json:JSON.stringify(extra)};
 }
 function toAdmin(row){let x={};try{x=JSON.parse(row.item_json||"{}");}catch{}return {...row,...x,item_json:undefined,online_published:Boolean(row.online_published)};}
@@ -527,6 +528,147 @@ async function analyzeItemCapture(body,env){
  return json({ok:true,result,model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100),webResearchUsed:(providerData.output||[]).some(x=>x.type==="web_search_call"),researchSources,disclaimer:"AI identification and estimates can be wrong. Confirm identifiers, provenance, condition and value before pricing or listing."});
 }
 
+
+function cleanBarcode(value){return s(value,50).replace(/[^0-9xX]/g,"").toUpperCase();}
+function normalizedIdentifiers(value){
+ if(!value)return [];
+ if(Array.isArray(value))return value.map(cleanBarcode).filter(Boolean);
+ return [cleanBarcode(value)].filter(Boolean);
+}
+function yearFromDate(value){const match=String(value||"").match(/\b(1[5-9]\d{2}|20\d{2}|21\d{2})\b/);return match?match[1]:"";}
+function bookDescription(value){if(typeof value==="string")return s(value,4500);if(value&&typeof value.value==="string")return s(value.value,4500);return "";}
+function firstValue(value){return Array.isArray(value)?s(value[0]||"",500):s(value||"",500);}
+function languageLabel(value){
+ const raw=Array.isArray(value)?s(value[0]||"",500):s(value||"",500);
+ const map={en:"English",eng:"English",es:"Spanish",spa:"Spanish",fr:"French",fre:"French",fra:"French",de:"German",ger:"German",deu:"German",it:"Italian",ita:"Italian",ja:"Japanese",jpn:"Japanese",zh:"Chinese",chi:"Chinese",zho:"Chinese",ru:"Russian",rus:"Russian"};
+ return map[raw.toLowerCase()]||raw;
+}
+async function safeExternalJson(url,headers){
+ try{const response=await fetch(url,{headers:Object.assign({accept:"application/json"},headers||{})});if(!response.ok)return null;return await response.json();}
+ catch{return null;}
+}
+function normalizeGoogleBook(item,barcode){
+ const info=item&&item.volumeInfo||{};
+ const identifiers=Array.isArray(info.industryIdentifiers)?info.industryIdentifiers.map(x=>cleanBarcode(x.identifier)):[];
+ if(!identifiers.includes(barcode))return null;
+ const images=info.imageLinks||{};
+ let image=String(images.thumbnail||images.smallThumbnail||"");
+ if(image.startsWith("http://"))image="https://"+image.slice(7);
+ return {
+  found:true,barcode,title:s(info.title,300),subtitle:s(info.subtitle,500),
+  author:Array.isArray(info.authors)?info.authors.map(x=>s(x,200)).filter(Boolean).join(", "):"",
+  publisher:s(info.publisher,500),publicationYear:yearFromDate(info.publishedDate),
+  edition:"",pageCount:Number.isFinite(Number(info.pageCount))?Number(info.pageCount):"",
+  format:s(info.printType==="BOOK"?"Book":info.printType,120),language:languageLabel(info.language),
+  subjects:Array.isArray(info.categories)?info.categories.join("; "):"",
+  description:bookDescription(info.description),imageUrl:image,source:"Google Books",confidence:"high",
+  metadataNote:"Exact ISBN matched to a Google Books bibliographic record. Physical condition, signature, first printing and acquisition cost are not encoded by the barcode."
+ };
+}
+function normalizeOpenLibraryBook(info,barcode){
+ if(!info||!info.title)return null;
+ const ids=[...normalizedIdentifiers(info.isbn_10),...normalizedIdentifiers(info.isbn_13)];
+ if(ids.length&&!ids.includes(barcode))return null;
+ let image="";
+ if(Array.isArray(info.covers)&&info.covers.length&&Number(info.covers[0])>0)image="https://covers.openlibrary.org/b/id/"+Number(info.covers[0])+"-L.jpg";
+ const subjects=Array.isArray(info.subjects)?info.subjects:[];
+ return {
+  found:true,barcode,title:s(info.title,300),subtitle:"",
+  author:Array.isArray(info.authors)?info.authors.map(x=>s(x.name||x,200)).filter(Boolean).join(", "):"",
+  publisher:firstValue(info.publishers),publicationYear:yearFromDate(info.publish_date||info.publishDate),
+  edition:"",pageCount:Number.isFinite(Number(info.number_of_pages))?Number(info.number_of_pages):"",
+  format:s(info.physical_format,120),
+  language:languageLabel(info.languages&&info.languages.map(x=>String(x.key||x).split("/").pop())),
+  subjects:subjects.slice(0,30).map(x=>s(x,150)).filter(Boolean).join("; "),
+  description:bookDescription(info.description),imageUrl:image,source:"Open Library",confidence:"high",
+  metadataNote:"Exact ISBN lookup matched an Open Library edition record. Physical condition, signature, first printing and acquisition cost are not encoded by the barcode."
+ };
+}
+async function lookupBookByBarcode(barcode,env){
+ const now=Date.now();
+ try{const cached=await env.DB.prepare("SELECT result_json,expires_at FROM barcode_metadata_cache WHERE barcode=?").bind(barcode).first();if(cached&&Date.parse(cached.expires_at)>now){try{return JSON.parse(cached.result_json);}catch{}}}catch{}
+ let result={found:false,barcode,source:"",confidence:"low",reason:"No exact book-edition match was found for this barcode. Enter the item manually or use AI Item Capture."};
+ const googleUrl=new URL("https://www.googleapis.com/books/v1/volumes");
+ googleUrl.searchParams.set("q","isbn:"+barcode);googleUrl.searchParams.set("maxResults","5");
+ const google=await safeExternalJson(googleUrl.toString());
+ const items=Array.isArray(google&&google.items)?google.items:[];
+ for(const item of items){const matched=normalizeGoogleBook(item,barcode);if(matched){result=matched;break;}}
+ const isbnLike=/^\d{9}[0-9X]$/.test(barcode)||(/^97[89]\d{10}$/.test(barcode));
+ if(!result.found&&isbnLike){
+  const ol=await safeExternalJson("https://openlibrary.org/isbn/"+encodeURIComponent(barcode)+".json",{"user-agent":"OneCopy/0.12.0 (barcode metadata lookup)"});
+  if(ol&&typeof ol==="object"){
+   const matched=normalizeOpenLibraryBook(ol,barcode);
+   if(matched)result=matched;
+   else if(ol.title&&typeof ol.key==="string"&&ol.key.startsWith("/books/"))result=normalizeOpenLibraryBook(Object.assign({},ol,{isbn_10:[barcode]}),barcode)||result;
+  }
+  if(!result.found){
+   const searchUrl=new URL("https://openlibrary.org/search.json");
+   searchUrl.searchParams.set("isbn",barcode);searchUrl.searchParams.set("limit","5");
+   searchUrl.searchParams.set("fields","title,author_name,publisher,publish_date,publish_year,isbn,cover_i,number_of_pages_median,language,subject,physical_format");
+   const data=await safeExternalJson(searchUrl.toString(),{"user-agent":"OneCopy/0.12.0 (barcode metadata lookup)"});
+   const docs=Array.isArray(data&&data.docs)?data.docs:[];
+   const exact=docs.find(d=>normalizedIdentifiers(d.isbn).includes(barcode));
+   if(exact){
+    const cover=Number(exact.cover_i)>0?"https://covers.openlibrary.org/b/id/"+Number(exact.cover_i)+"-L.jpg":"";
+    result={found:true,barcode,title:s(exact.title,300),subtitle:"",author:Array.isArray(exact.author_name)?exact.author_name.join(", "):"",publisher:firstValue(exact.publisher),publicationYear:"",edition:"",pageCount:Number.isFinite(Number(exact.number_of_pages_median))?Number(exact.number_of_pages_median):"",format:firstValue(exact.physical_format),language:languageLabel(exact.language),subjects:Array.isArray(exact.subject)?exact.subject.slice(0,30).join("; "):"",description:"",imageUrl:cover,source:"Open Library Search",confidence:"medium",metadataNote:"Exact ISBN found in Open Library Search. Some edition-level facts may be incomplete; verify the copyright/imprint page."};
+   }
+  }
+ }
+ const fetchedAt=new Date().toISOString();
+ const expiresAt=new Date(now+(result.found?30*24*60*60*1000:12*60*60*1000)).toISOString();
+ try{await env.DB.prepare("INSERT INTO barcode_metadata_cache (barcode,result_json,fetched_at,expires_at) VALUES (?,?,?,?) ON CONFLICT(barcode) DO UPDATE SET result_json=excluded.result_json,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at").bind(barcode,JSON.stringify(result),fetchedAt,expiresAt).run();}catch{}
+ return result;
+}
+const SCANNED_BOOK_PRICE_SCHEMA={
+ type:"object",additionalProperties:false,
+ required:["msrp","estimatedLow","estimatedHigh","suggestedPrice","valuationBasis","valuationConfidence","marketEvidence","notes","needsReview"],
+ properties:{
+  msrp:{type:["number","null"]},estimatedLow:{type:["number","null"]},estimatedHigh:{type:["number","null"]},suggestedPrice:{type:["number","null"]},
+  valuationBasis:{type:"string",enum:["sold_comps","active_listings","catalog","none"]},
+  valuationConfidence:{type:"string",enum:["low","medium","high"]},
+  marketEvidence:{type:"array",items:{type:"object",additionalProperties:false,required:["title","seller","price","currency","condition","status","url","date","comparability"],properties:{
+   title:{type:"string"},seller:{type:"string"},price:{type:["number","null"]},currency:{type:"string"},
+   condition:{type:"string"},status:{type:"string",enum:["active_listing","sold_record","catalog_reference","unknown"]},
+   url:{type:"string"},date:{type:"string"},comparability:{type:"string"}
+  }}},
+  notes:{type:"string"},needsReview:{type:"boolean"}
+ }
+};
+async function researchScannedBookPrice(book,env){
+ const prompt=[
+  "You are a cautious used-book cataloging and market-research assistant for an independent bookstore in Pomona, California.",
+  "Research the exact edition identified by this barcode; do not substitute another edition, format, translation or a modern reprint for an older original.",
+  "Bibliographic record: ISBN/barcode="+book.barcode+"; title="+book.title+"; subtitle="+(book.subtitle||"unknown")+"; author="+(book.author||"unknown")+"; publisher="+(book.publisher||"unknown")+"; edition publication year="+(book.publicationYear||"unknown")+"; format="+(book.format||"unknown")+"; pages="+(book.pageCount||"unknown")+".",
+  "The physical copy's condition, completeness, signatures, first printing, provenance and acquisition cost are unknown. Do not assume As New condition or authenticity.",
+  "Use web search to find exact-edition publisher/retail cover-price evidence, relevant active listings, and completed/sold records. Never invent URLs, prices, sold dates, sellers or comps. Clearly distinguish sold records from active asking prices.",
+  "Only fill MSRP when there is evidence of a printed cover price or publisher suggested retail price for this exact format/edition; do not use ebook sale prices as print MSRP. Only estimate a market range when evidence genuinely supports it. If evidence is thin or the edition/condition materially changes value, use null prices and recommend review.",
+  "SuggestedPrice is only a draft asking-price suggestion, not an appraisal. Prefer sold records for comparable-price value. Report source URLs and currency.",
+  "Today is "+new Date().toISOString().slice(0,10)+". Return structured data only."
+ ].join("\n");
+ let response;
+ try{
+  response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"authorization":"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},body:JSON.stringify({model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100),tools:[{type:"web_search"}],tool_choice:"required",include:["web_search_call.action.sources"],input:[{role:"user",content:[{type:"input_text",text:prompt}]}],text:{format:{type:"json_schema",name:"onecopy_scanned_book_price",strict:true,schema:SCANNED_BOOK_PRICE_SCHEMA}},max_output_tokens:2200})});
+ }catch{return {ok:false,error:"Could not reach the AI research service. Bibliographic metadata was still retrieved."};}
+ const providerData=await response.json().catch(()=>({}));
+ if(!response.ok){
+  const detail=response.status===429?"The AI research usage limit was reached.":response.status===401||response.status===403?"The AI provider rejected the configured key or model access.":"The AI price research request failed (HTTP "+response.status+").";
+  return {ok:false,error:detail+" Bibliographic metadata was still retrieved."};
+ }
+ const output=(providerData.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==="output_text"&&typeof x.text==="string").map(x=>x.text).join("\n");
+ let result;try{result=JSON.parse(output);}catch{return {ok:false,error:"AI price research returned an invalid result. Bibliographic metadata was still retrieved."};}
+ for(const key of ["msrp","estimatedLow","estimatedHigh","suggestedPrice"]){const n=Number(result[key]);result[key]=result[key]===null||result[key]===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100;}
+ if(!["sold_comps","active_listings","catalog","none"].includes(result.valuationBasis))result.valuationBasis="none";
+ if(!["low","medium","high"].includes(result.valuationConfidence))result.valuationConfidence="low";
+ result.notes=s(result.notes,1600);
+ result.marketEvidence=(Array.isArray(result.marketEvidence)?result.marketEvidence:[]).slice(0,8).map(x=>{
+  let url="";try{const u=new URL(String(x.url||""));if(u.protocol==="https:"||u.protocol==="http:")url=u.toString();}catch{}
+  const n=Number(x.price);
+  return {title:s(x.title,250),seller:s(x.seller,160),price:x.price===null||x.price===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100,currency:s(x.currency||"USD",10),condition:s(x.condition,100),status:["active_listing","sold_record","catalog_reference","unknown"].includes(x.status)?x.status:"unknown",url,date:s(x.date,80),comparability:s(x.comparability,350)};
+ });
+ const researchSources=(providerData.output||[]).filter(x=>x.type==="web_search_call").flatMap(x=>x.action&&Array.isArray(x.action.sources)?x.action.sources:[]).map(x=>{let url="";try{const u=new URL(String(x.url||""));if(u.protocol==="https:"||u.protocol==="http:")url=u.toString();}catch{}return {title:s(x.title||url,250),url};}).filter(x=>x.url).slice(0,12);
+ return {ok:true,result,researchSources,disclaimer:"Price results are research suggestions, not a formal appraisal. Confirm exact edition, physical condition and source records before setting a final price."};
+}
+
 async function api(req,env,url){
  const p=url.pathname,method=req.method.toUpperCase();
 
@@ -549,6 +691,17 @@ async function api(req,env,url){
   await ensureSchema(env);
 
 
+  if(p==="/api/admin/catalog/status"&&method==="GET")return json({aiPricingConfigured:Boolean(env.OPENAI_API_KEY),model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});
+  if(p==="/api/admin/catalog/lookup"&&method==="POST"){
+   const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);
+   const barcode=cleanBarcode(b.barcode);if(barcode.length<8||barcode.length>14)return json({error:"Scan an ISBN or barcode of 8–14 digits."},400);
+   const book=await lookupBookByBarcode(barcode,env);
+   const duplicateRows=await env.DB.prepare("SELECT id,title,author,isbn,condition,price,zone,location,created_at FROM products WHERE isbn=? OR isbn LIKE ? ORDER BY created_at DESC LIMIT 12").bind(barcode,"%"+barcode+"%").all();
+   let pricing=null;
+   if(b.researchPrices&&env.OPENAI_API_KEY&&book.found)pricing=await researchScannedBookPrice(book,env);
+   else if(b.researchPrices&&!env.OPENAI_API_KEY)pricing={ok:false,error:"AI price research is not configured. Add OPENAI_API_KEY in Cloudflare to enable this optional, potentially billable feature."};
+   return json({ok:true,barcode,book,duplicates:duplicateRows.results||[],pricing,aiPricingConfigured:Boolean(env.OPENAI_API_KEY)});
+  }
   if(p==="/api/admin/item-capture/status"&&method==="GET")return json({configured:Boolean(env.OPENAI_API_KEY),model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});
   if(p==="/api/admin/item-capture/analyze"&&method==="POST"){const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);return await analyzeItemCapture(b,env);}
   if(p==="/api/admin/themes"&&method==="GET"){
@@ -702,7 +855,7 @@ export default {async fetch(req,env){
  const url=new URL(req.url);
  try{
   if(url.pathname==="/api/ebay/callback"&&req.method.toUpperCase()==="GET")return await handleEbayCallback(req,env,url);
-  if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.11.0",inventory:"empty by default"});}
+  if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.12.0",inventory:"empty by default"});}
   if(url.pathname==="/admin"||url.pathname==="/admin/")return env.ASSETS.fetch(new Request(new URL("/admin.html",url),{method:"GET"}));
   if(url.pathname.startsWith("/api/"))return await api(req,env,url);
   return env.ASSETS.fetch(req);
