@@ -419,7 +419,7 @@ async function publishEbayItem(env,productId,titleOverride,submittedAspects){
 }
 
 function normal(body){
- const title=s(body.title,300);if(!title)return {error:"Item name is required."};
+ const title=s(body.title,300);if(!title&&!s(body.isbn,40))return {error:"Enter a barcode or item title to create an intake draft."};
  const zone=zones.has(body.zone)?body.zone:"rear_restricted";
  const review=reviews.has(body.review_status)?body.review_status:"needs_partner_review";
  const status=statuses.has(body.status)?body.status:"in_stock";
