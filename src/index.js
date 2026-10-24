@@ -491,8 +491,62 @@ function captureImageDataUrl(value){
  return {mime:match[1],dataUrl:"data:"+match[1]+";base64,"+data,size:data.length};
 }
 function captureText(v,limit=500){return s(v,limit);}
+
+async function analyzeItemCaptureWithGemini(body,env){
+ if(!env.GEMINI_API_KEY)return json({error:"Gemini image analysis is not configured. Add GEMINI_API_KEY as a Cloudflare Worker secret."},503);
+ const incoming=Array.isArray(body.images)?body.images.slice(0,5):[];
+ const images=incoming.map(x=>captureImageDataUrl(x&&x.dataUrl)).filter(Boolean);
+ if(!images.length)return json({error:"Add at least one clear photo before analyzing the item. The camera captures individual still images."},400);
+ if(incoming.length>5)return json({error:"Please use no more than five photos per item."},400);
+ if(images.length!==incoming.length)return json({error:"One or more images were invalid. Use JPEG, PNG or WebP photos and try again."},400);
+ if(images.reduce((total,x)=>total+x.size,0)>7000000)return json({error:"The photos are too large. Capture fewer images or reduce image size, then retry."},413);
+ const itemType=s(body.itemType||"Auto",80),notes=s(body.notes||"",1800);
+ const prompt=[
+  "You are OneCopy's careful cataloging assistant for an independent used bookstore and second-hand/antiques retailer.",
+  "Return one valid JSON object with the following keys: itemType, title, creator, brand, manufacturer, publisher, publicationYear, edition, identifier, materials, model, conditionAssessment, conditionNotes, description, features, confidence, needsReview, reviewReasons, estimatedLow, estimatedHigh, suggestedPrice, valuationBasis, valuationNotes, marketEvidence, searchQueries.",
+  "itemType must be Book, Clothing, Jewelry, Antique / Collectible, Home decor, Game, Gift, Stationery, or Other. conditionAssessment must be As New, Very Good, Good, Acceptable, Fair, Not Applicable, or Unknown. confidence must be low, medium, or high. needsReview is boolean; features, reviewReasons, marketEvidence and searchQueries are arrays.",
+  "Transcribe only details visible in the provided photos and notes: readable ISBNs, title, author, publisher/imprint, copyright year, stated edition/printing, model numbers, maker marks, material labels and visible signatures. A barcode identifies a product/edition, not the condition or authenticity of the physical copy.",
+  "Do not guess any field. Leave uncertain strings blank and mention the uncertainty in reviewReasons. Do not authenticate signatures, claim rarity, or infer first-print status without evidence.",
+  "This request has no live web search. Do not invent prices, comps, URLs, sold dates or marketplace sources. Unless a printed price is visibly shown, estimatedLow, estimatedHigh and suggestedPrice must be null, valuationBasis must be none, marketEvidence must be [], and valuationNotes must say that no live market research was performed.",
+  "Selected item type: "+itemType+". Staff observations: "+(notes||"None supplied")+". Return JSON only, without Markdown fences."
+ ].join("\n");
+ const parts=[{text:prompt}];
+ for(const img of images){const comma=img.dataUrl.indexOf(",");parts.push({inlineData:{mimeType:img.mime,data:comma>=0?img.dataUrl.slice(comma+1):""}});}
+ const model=s(env.GEMINI_MODEL||"gemini-3.8-flash",100);
+ let response;
+ try{
+  response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent?key="+encodeURIComponent(env.GEMINI_API_KEY),{
+   method:"POST",headers:{"content-type":"application/json"},
+   body:JSON.stringify({contents:[{role:"user",parts}],generationConfig:{temperature:0.2,responseMimeType:"application/json",maxOutputTokens:3500}})
+  });
+ }catch{return json({error:"Could not reach Gemini. Check the Worker network/logs and try again."},502);}
+ const providerData=await response.json().catch(()=>({}));
+ if(!response.ok){
+  const detail=response.status===429?"Gemini's current rate limit or daily quota was reached. Check AI Studio for this project's active limits.":response.status===400?"Gemini rejected the request. Check the configured model and try fewer or clearer photos.":response.status===401||response.status===403?"Gemini rejected the API key or project access. Check GEMINI_API_KEY and Google AI Studio settings.":"Gemini analysis failed (HTTP "+response.status+").";
+  return json({error:detail},response.status===429?429:502);
+ }
+ const output=(providerData.candidates||[]).flatMap(x=>x.content&&Array.isArray(x.content.parts)?x.content.parts:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
+ let result;
+ try{result=JSON.parse(output.replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,""));}catch{return json({error:"Gemini returned an invalid catalog result. Try clearer photos or fewer items."},502);}
+ const fields=["title","creator","brand","manufacturer","publisher","publicationYear","edition","identifier","materials","model","conditionNotes","description","valuationNotes"];
+ for(const key of fields)result[key]=captureText(result[key],key==="description"?1800:700);
+ result.itemType=["Book","Clothing","Jewelry","Antique / Collectible","Home decor","Game","Gift","Stationery","Other"].includes(result.itemType)?result.itemType:"Other";
+ result.conditionAssessment=["As New","Very Good","Good","Acceptable","Fair","Not Applicable","Unknown"].includes(result.conditionAssessment)?result.conditionAssessment:"Unknown";
+ result.features=Array.isArray(result.features)?result.features.slice(0,12).map(x=>captureText(x,220)):[];
+ result.reviewReasons=Array.isArray(result.reviewReasons)?result.reviewReasons.slice(0,10).map(x=>captureText(x,220)):[];
+ result.searchQueries=Array.isArray(result.searchQueries)?result.searchQueries.slice(0,6).map(x=>captureText(x,200)):[];
+ result.marketEvidence=[];
+ for(const key of ["estimatedLow","estimatedHigh","suggestedPrice"]){const n=Number(result[key]);result[key]=result[key]===null||result[key]===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100;}
+ result.valuationBasis="none";
+ if(!["low","medium","high"].includes(result.confidence))result.confidence="low";
+ result.needsReview=true;
+ return json({ok:true,result,model,provider:"gemini",webResearchUsed:false,researchSources:[],disclaimer:"Gemini capture does not run live market research. Verify identifiers and physical condition. AI identification is not authentication or appraisal."});
+}
+
 async function analyzeItemCapture(body,env){
- if(!env.OPENAI_API_KEY)return json({error:"AI Item Capture is not configured. In Cloudflare, open your OneCopy Worker → Settings → Variables and Secrets, then add OPENAI_API_KEY as a secret. The ChatGPT subscription and API billing are separate."},503);
+ const provider=itemCaptureProvider(env);
+ if(provider==="gemini")return await analyzeItemCaptureWithGemini(body,env);
+ if(provider!=="openai")return json({error:"AI Item Capture is not configured. Add GEMINI_API_KEY for the free-tier Gemini capture path, or OPENAI_API_KEY for the separate OpenAI API path."},503);
  const incoming=Array.isArray(body.images)?body.images.slice(0,5):[];
  const images=incoming.map(x=>captureImageDataUrl(x&&x.dataUrl)).filter(Boolean);
  if(!images.length)return json({error:"Add at least one clear photo before analyzing the item. The camera captures individual still images."},400);
@@ -725,7 +779,7 @@ async function api(req,env,url){
   await ensureSchema(env);
 
 
-  if(p==="/api/admin/catalog/status"&&method==="GET")return json({aiPricingConfigured:Boolean(env.OPENAI_API_KEY),model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});
+  if(p==="/api/admin/catalog/status"&&method==="GET"){const provider=itemCaptureProvider(env);return json({aiPricingConfigured:Boolean(env.OPENAI_API_KEY),pricingProvider:env.OPENAI_API_KEY?"openai":"none",captureConfigured:Boolean(provider),captureProvider:provider||"none",captureModel:provider==="gemini"?s(env.GEMINI_MODEL||"gemini-3.8-flash",100):provider==="openai"?s(env.OPENAI_MODEL||"gpt-4.1-mini",100):"",model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});}
   if(p==="/api/admin/catalog/lookup"&&method==="POST"){
    const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);
    const barcode=cleanBarcode(b.barcode);if(barcode.length<8||barcode.length>14)return json({error:"Scan an ISBN or barcode of 8–14 digits."},400);
@@ -736,7 +790,7 @@ async function api(req,env,url){
    else if(b.researchPrices&&!env.OPENAI_API_KEY)pricing={ok:false,error:"AI price research is not configured. Add OPENAI_API_KEY in Cloudflare to enable this optional, potentially billable feature."};
    return json({ok:true,barcode,book,duplicates:duplicateRows.results||[],pricing,aiPricingConfigured:Boolean(env.OPENAI_API_KEY)});
   }
-  if(p==="/api/admin/item-capture/status"&&method==="GET")return json({configured:Boolean(env.OPENAI_API_KEY),model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});
+  if(p==="/api/admin/item-capture/status"&&method==="GET"){const provider=itemCaptureProvider(env);return json({configured:Boolean(provider),provider:provider||"none",model:provider==="gemini"?s(env.GEMINI_MODEL||"gemini-3.8-flash",100):provider==="openai"?s(env.OPENAI_MODEL||"gpt-4.1-mini",100):"",webResearchAvailable:provider==="openai"&&Boolean(env.OPENAI_API_KEY)});}
   if(p==="/api/admin/item-capture/analyze"&&method==="POST"){const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);return await analyzeItemCapture(b,env);}
   if(p==="/api/admin/themes"&&method==="GET"){
    const rows=await env.DB.prepare("SELECT id,name,theme_json,is_active,created_at,updated_at FROM storefront_skins ORDER BY is_active DESC,name ASC").all();
@@ -910,7 +964,7 @@ export default {async fetch(req,env){
  const url=new URL(req.url);
  try{
   if(url.pathname==="/api/ebay/callback"&&req.method.toUpperCase()==="GET")return await handleEbayCallback(req,env,url);
-  if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.13.0",inventory:"empty by default"});}
+  if(url.pathname==="/health"){await ensureSchema(env);const r=await env.DB.prepare("SELECT 1 AS ok").first();return json({ok:Boolean(r&&r.ok===1),app:"OneCopy Commerce",version:"0.14.0",inventory:"empty by default"});}
   if(url.pathname==="/admin"||url.pathname==="/admin/")return env.ASSETS.fetch(new Request(new URL("/admin.html",url),{method:"GET"}));
   if(url.pathname.startsWith("/api/"))return await api(req,env,url);
   return env.ASSETS.fetch(req);
