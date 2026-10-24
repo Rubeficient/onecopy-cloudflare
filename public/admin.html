@@ -82,15 +82,21 @@
 </section>
 <section id="receivePanel" data-panel="receive" class="hidden"><section class="panel"><div class="panel-head"><div><div class="kicker">Receiving station</div><h2>Receive a new item</h2><p class="explain">Catalog it once, assign its destination and keep it private until reviewed.</p></div><span class="pill gold">NEW RECORD</span></div>
 <form id="itemForm"><div class="formgrid">
-<div class="field"><label for="title">TITLE / ITEM NAME *</label><input id="title" required maxlength="300" placeholder="Book title or product name"></div><div class="field"><label for="author">AUTHOR / MAKER</label><input id="author" maxlength="300" placeholder="Author, artist or brand"></div>
-<div class="field"><label for="isbn">ISBN / UPC / BARCODE</label><input id="isbn" maxlength="40" placeholder="Scan or enter code"></div><div class="field"><label for="category">DEPARTMENT</label><select id="category"><option>Book</option><option>Clothing</option><option>Jewelry</option><option>Antique / Collectible</option><option>Home decor</option><option>Gift</option><option>Snack</option><option>Beverage</option><option>Coffee</option><option>Game</option><option>Stationery</option><option>Other</option></select></div>
-<div class="field"><label for="price">ASKING PRICE (USD)</label><input id="price" type="number" min="0" step=".01" value="0"><span class="fieldnote">The actual price you intend to charge. MSRP is a reference anchor—not a market appraisal.</span></div><div class="field"><label for="msrp">MSRP / COVER PRICE (USD)</label><input id="msrp" type="number" min="0" step=".01" value="0"><button class="btn secondary price-action" id="useMsrp" type="button">Use MSRP as asking price</button><span class="fieldnote">For eligible as-new, ordinary modern books, MSRP is the default starting point.</span></div>
-<div class="field"><label for="cost">ACQUISITION COST (USD)</label><input id="cost" type="number" min="0" step=".01" value="0"></div><div class="field"><label for="condition">CONDITION</label><select id="condition"><option>As New</option><option>Very Good</option><option selected>Good</option><option>Acceptable</option><option>Fair</option><option>Unknown — assess manually</option><option>Not Applicable</option></select></div><div class="flagrow"><label><input id="signed" type="checkbox"> Signed / inscribed</label><label><input id="firstEdition" type="checkbox"> First edition / printing</label><label><input id="special" type="checkbox"> Special / unusual copy</label><span class="fieldnote">Any checked flag means: pause ordinary MSRP pricing and request partner review.</span></div>
+<div class="field wide scan-field"><label for="isbn">SCAN ISBN / UPC / BARCODE FIRST</label><div class="scan-row"><input id="isbn" maxlength="40" autocomplete="off" inputmode="numeric" placeholder="Scan a book ISBN barcode" aria-describedby="scanHint"><button class="btn secondary" id="lookupBarcode" type="button">Look up scan ↗</button></div><span id="scanHint" class="fieldnote">A USB scanner can type here like a keyboard. Lookups start automatically after a barcode is entered.</span><div id="scanLookupStatus" class="message hidden" role="status" aria-live="polite"></div><input id="metadataSource" type="hidden"><input id="metadataConfidence" type="hidden"><input id="metadataNotes" type="hidden"></div>
+<div class="field"><label for="title">TITLE / ITEM NAME *</label><input id="title" required maxlength="300" placeholder="Filled from exact book match when available"></div><div class="field"><label for="author">AUTHOR / MAKER</label><input id="author" maxlength="300" placeholder="Author, artist or brand"></div>
+<div class="field"><label for="publisher">PUBLISHER</label><input id="publisher" maxlength="500" placeholder="Publisher or imprint"></div><div class="field"><label for="publicationYear">EDITION PUBLICATION YEAR</label><input id="publicationYear" maxlength="40" placeholder="Year for this edition"></div>
+<div class="field"><label for="edition">EDITION / PRINTING NOTES</label><input id="edition" maxlength="500" placeholder="Only if verified"></div><div class="field"><label for="pageCount">PAGE COUNT</label><input id="pageCount" type="number" min="0" step="1" placeholder="Pages"></div>
+<div class="field"><label for="format">FORMAT</label><select id="format"><option value="">Unknown</option><option>Hardcover</option><option>Paperback</option><option>Mass market paperback</option><option>Large print</option><option>Spiral bound</option><option>Audio</option><option>eBook</option><option>Book</option><option>Other</option></select></div><div class="field"><label for="language">LANGUAGE</label><input id="language" maxlength="100" placeholder="Language"></div>
+<div class="field wide"><label for="subjects">SUBJECTS / CATEGORIES</label><input id="subjects" maxlength="1500" placeholder="Subjects or catalog categories"></div>
+<div class="field"><label for="category">DEPARTMENT</label><select id="category"><option>Book</option><option>Clothing</option><option>Jewelry</option><option>Antique / Collectible</option><option>Home decor</option><option>Gift</option><option>Snack</option><option>Beverage</option><option>Coffee</option><option>Game</option><option>Stationery</option><option>Other</option></select></div>
+<div class="field"><label for="price">ASKING PRICE (USD)</label><input id="price" type="number" min="0" step=".01" value="0"><span class="fieldnote">The actual price you intend to charge. MSRP is a reference anchor—not a market appraisal.</span></div><div class="field"><label for="msrp">MSRP / COVER PRICE (USD)</label><input id="msrp" type="number" min="0" step=".01" value="0"><button class="btn secondary price-action" id="useMsrp" type="button">Use MSRP as asking price</button><span class="fieldnote">Only enter a verified printed cover price; digital retail prices are not print MSRP.</span></div>
+<div class="field wide scan-research"><label for="scanResearchPrices"><input id="scanResearchPrices" type="checkbox"> Add AI web research for price, MSRP and sold comparables during scans</label><span class="fieldnote">Optional. Each scan can trigger a web-research API call and may incur charges. It only fills values when evidence is found; it is not an appraisal.</span><span id="scanResearchHint" class="fieldnote">Bibliographic lookups do not require the AI pricing feature.</span></div>
+<div class="field"><label for="cost">ACQUISITION COST (USD)</label><input id="cost" type="number" min="0" step=".01" value="0"></div><div class="field"><label for="condition">CONDITION</label><select id="condition"><option>As New</option><option>Very Good</option><option>Good</option><option>Acceptable</option><option>Fair</option><option selected>Unknown — assess manually</option><option>Not Applicable</option></select></div><div class="flagrow"><label><input id="signed" type="checkbox"> Signed / inscribed</label><label><input id="firstEdition" type="checkbox"> First edition / printing</label><label><input id="special" type="checkbox"> Special / unusual copy</label><span class="fieldnote">Any checked flag means: pause ordinary MSRP pricing and request partner review.</span></div>
 <div class="field"><label for="zone">WAREHOUSE ZONE</label><select id="zone"><option value="middle_retail">Middle — Standard retail</option><option value="front_special">Front — Special display</option><option value="annex_retail">Annex — Coffee, snacks & gifts</option><option value="rear_restricted">Rear — Restricted review</option></select></div><div class="field"><label for="location">SHELF / BIN LOCATION</label><input id="location" placeholder="e.g. M-03, Annex-Gift-1"></div>
 <div class="field"><label for="quantity">QUANTITY ON HAND</label><input id="quantity" type="number" min="0" max="100000" value="1"></div><div class="field"><label for="stockMode">STOCK TYPE</label><select id="stockMode"><option value="unique">Unique copy / one-off</option><option value="quantity">Quantity-tracked merchandise</option></select></div>
 <div class="field"><label for="cpv">CPV · COMPARABLE PRICE VALUE (USD)</label><input id="cpv" type="number" min="0" step=".01" value="0"><span class="fieldnote">Evidence-based market reference. Prefer completed sales of genuinely similar copies.</span></div><div class="field"><label for="tpv">TPV · TARGET PRICE VALUE (USD)</label><input id="tpv" type="number" min="0" step=".01" value="0"><span class="fieldnote">Your proposed target asking price after condition, scarcity, demand, costs and selling fees are considered.</span></div><div class="field"><label for="valuationBasis">VALUATION EVIDENCE</label><select id="valuationBasis"><option value="none">Not researched yet</option><option value="sold_comps">Recent completed sales</option><option value="catalog">Catalog / published price guide</option><option value="internal_sales">Our own sales history</option><option value="appraisal">Professional appraisal</option><option value="partner_judgment">Partner judgment</option></select></div><div class="field"><label for="valuationConfidence">EVIDENCE CONFIDENCE</label><select id="valuationConfidence"><option value="low">Low — thin or uncertain evidence</option><option value="medium">Medium — some comparable evidence</option><option value="high">High — strong, close matches</option></select></div><div class="field wide"><label for="marketComps">COMPARABLE SALES / SOURCES</label><textarea id="marketComps" placeholder="Sale price, sold date, edition/condition match, source links, fees/shipping considerations…"></textarea><span class="fieldnote">Record the evidence so another staff member can understand and reproduce the decision.</span></div>
 <div class="field wide"><label for="image">IMAGE URL (OPTIONAL)</label><input id="image" type="url" placeholder="https://…"></div><div class="field wide"><label for="description">DESCRIPTION</label><textarea id="description" placeholder="Edition, notable details, description for customers…"></textarea></div><div class="field wide"><label for="notes">STAFF / PARTNER NOTES</label><textarea id="notes" placeholder="Internal notes; keep special details here for review."></textarea></div>
-</div><div class="btnline"><button class="btn" id="saveItemButton" type="submit">Save item to inventory →</button><button class="btn secondary" type="button" id="resetForm">Clear form</button></div></form><section class="valuation-guide"><h3>OneCopy pricing philosophy</h3><p>Use a consistent rule for routine stock, then reserve human judgment for exceptions. The fields below record distinct kinds of evidence; they are not all interchangeable price tags.</p><div class="guidegrid"><article class="guidecard"><strong>MSRP — the routine baseline</strong><p>For an ordinary, modern, mass-produced book in <em>As New</em> condition, start at the verified cover price. Do not use MSRP blindly for used, old, scarce, signed, first-edition or unusual copies. Never invent a cover price when it is unknown.</p></article><article class="guidecard"><strong>CPV — market evidence</strong><p>Comparable Price Value is a reference drawn from genuinely similar items. Prefer completed/sold transactions over unsold asking prices. Match edition, format and condition, and consider date, shipping and selling channel.</p></article><article class="guidecard"><strong>TPV — target strategy</strong><p>Target Price Value is OneCopy’s working target asking price: market evidence considered alongside condition, rarity, demand, how quickly the item should sell, acquisition cost and channel fees. This field is a human-entered estimate in this version, not an automatic appraisal.</p></article><article class="guidecard"><strong>Confidence — how strong is the evidence?</strong><p>Confidence describes the evidence, not how much we like the price. Use Low for sparse/weak matches, Medium for some comparable support, and High for several recent, close matches. Keep source notes so estimates can be audited.</p></article></div><p style="margin-top:12px"><strong>Moneyball rule:</strong> separate observable facts from assumptions. Track sold price, sell-through, time-to-sale, discount and net proceeds over time; don’t treat a high asking price as proof that an item is worth that amount.</p></section><div id="notice" class="message hidden"></div><div class="section-footer">New items start unpublished. Rear-zone items remain restricted until a partner reviews them.</div></section></section>
+</div><div class="btnline"><button class="btn" id="saveItemButton" type="submit" data-mode="next">Save &amp; scan next →</button><button class="btn secondary" id="saveFinishButton" type="submit" data-mode="finish">Save &amp; finish receiving</button><button class="btn secondary" type="button" id="resetForm">Clear form</button></div></form><section class="scan-session"><div class="scan-session-head"><div><h3>Current scan session</h3><p>Recent saved records stay here while you receive a batch.</p></div><span class="pill gold" id="scanSessionCount">0 saved</span></div><div id="scanSessionRows" class="scan-session-rows"><p class="fieldnote">Saved items will appear here. Use “Save &amp; scan next” to keep receiving without switching views.</p></div></section><section class="valuation-guide"><h3>OneCopy pricing philosophy</h3><p>Use a consistent rule for routine stock, then reserve human judgment for exceptions. The fields below record distinct kinds of evidence; they are not all interchangeable price tags.</p><div class="guidegrid"><article class="guidecard"><strong>MSRP — the routine baseline</strong><p>For an ordinary, modern, mass-produced book in <em>As New</em> condition, start at the verified cover price. Do not use MSRP blindly for used, old, scarce, signed, first-edition or unusual copies. Never invent a cover price when it is unknown.</p></article><article class="guidecard"><strong>CPV — market evidence</strong><p>Comparable Price Value is a reference drawn from genuinely similar items. Prefer completed/sold transactions over unsold asking prices. Match edition, format and condition, and consider date, shipping and selling channel.</p></article><article class="guidecard"><strong>TPV — target strategy</strong><p>Target Price Value is OneCopy’s working target asking price: market evidence considered alongside condition, rarity, demand, how quickly the item should sell, acquisition cost and channel fees. This field is a human-entered estimate in this version, not an automatic appraisal.</p></article><article class="guidecard"><strong>Confidence — how strong is the evidence?</strong><p>Confidence describes the evidence, not how much we like the price. Use Low for sparse/weak matches, Medium for some comparable support, and High for several recent, close matches. Keep source notes so estimates can be audited.</p></article></div><p style="margin-top:12px"><strong>Moneyball rule:</strong> separate observable facts from assumptions. Track sold price, sell-through, time-to-sale, discount and net proceeds over time; don’t treat a high asking price as proof that an item is worth that amount.</p></section><div id="notice" class="message hidden"></div><div class="section-footer">New items start unpublished. Rear-zone items remain restricted until a partner reviews them.</div></section></section>
 <section id="capturePanel" data-panel="capture" class="hidden">
  <section class="panel">
   <div class="panel-head"><div><div class="kicker">Camera intake · assisted cataloging</div><h2>AI Item Capture</h2><p class="explain">Photograph the item, label, copyright page, hallmark or maker's mark. OneCopy will identify what it can, look for reference listings, and prepare a draft for your review.</p></div><span class="pill gold">REVIEW BEFORE SAVE</span></div>
@@ -296,7 +302,7 @@ function msg(el,t,err){el.textContent=t;el.classList.remove("hidden","error");if
 function notice(t,err){var target=$("#globalNotice")||$("#notice");msg(target,t,err)}
 async function api(path,opts){opts=opts||{};opts.credentials="same-origin";opts.headers=Object.assign({"content-type":"application/json"},opts.headers||{});var r=await fetch(path,opts),d=await r.json().catch(function(){return {error:"Unexpected server response"}});if(!r.ok)throw Error(d.error||("HTTP "+r.status));return d}
 function loginView(){$("#login").classList.remove("hidden");$("#app").classList.add("hidden")}
-async function appView(){$("#login").classList.add("hidden");$("#app").classList.remove("hidden");setView("overview");await Promise.all([loadProducts(),loadOrders(),loadThemeLibrary()]);await loadEbayPanel();handleEbayReturnMessage()}
+async function appView(){$("#login").classList.add("hidden");$("#app").classList.remove("hidden");setView("overview");await Promise.all([loadProducts(),loadOrders(),loadThemeLibrary(),loadScanSettings()]);await loadEbayPanel();handleEbayReturnMessage()}
 
 var captureImages=[],captureStream=null,captureResult=null,captureStatusLoaded=false;
 function setCaptureStatus(text,tone){var el=$("#captureRunStatus");el.textContent=text||"";el.className="capture-run-status"+(tone?" "+tone:"")}
@@ -445,7 +451,7 @@ $("#captureTransfer").addEventListener("click",function(){
  notice("AI draft transferred to Receive Item. Confirm the title/edition, condition and price evidence; photos are not yet stored with the record. Save when reviewed.");
 });
 
-function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#title").focus()},60);if(name==="capture")setTimeout(function(){loadCaptureStatus()},30);if(name==="ebay")setTimeout(function(){loadEbayPanel()},30);if(name==="design")setTimeout(function(){if(!themeLibraryLoaded)loadThemeLibrary();else sendThemePreview()},30)}
+function setView(name){document.querySelectorAll("[data-panel]").forEach(function(p){p.classList.toggle("hidden",p.dataset.panel!==name)});document.querySelectorAll(".navbtn").forEach(function(b){b.classList.toggle("active",b.dataset.nav===name)});if(name==="receive")setTimeout(function(){$("#isbn").focus()},60);if(name==="capture")setTimeout(function(){loadCaptureStatus()},30);if(name==="ebay")setTimeout(function(){loadEbayPanel()},30);if(name==="design")setTimeout(function(){if(!themeLibraryLoaded)loadThemeLibrary();else sendThemePreview()},30)}
 document.querySelectorAll("[data-nav]").forEach(function(b){b.addEventListener("click",function(){setView(b.dataset.nav)})});
 $("#loginForm").addEventListener("submit",async function(e){e.preventDefault();try{await api("/api/admin/login",{method:"POST",body:JSON.stringify({password:$("#password").value})});$("#password").value="";await appView()}catch(err){msg($("#loginMsg"),err.message,true)}});
 $("#logout").addEventListener("click",async function(){try{await api("/api/admin/logout",{method:"POST",body:"{}"})}catch(e){}loginView()});
@@ -611,7 +617,150 @@ function updateDashboard(){var total=inventoryRows.length,published=inventoryRow
 async function loadProducts(){try{var d=await api("/api/admin/products");inventoryRows=d.products||[];updateDashboard();renderProducts()}catch(e){if(e.message.indexOf("sign in")>=0)loginView();else{console.error("OneCopy inventory load failed:",e);$("#overviewQueue").innerHTML='<div class="message error">Inventory could not load: '+esc(e.message)+'</div>';$("#products").innerHTML='<tr><td colspan="5" class="emptyrow">Inventory could not load: '+esc(e.message)+'</td></tr>';$("#inventoryFooter").textContent="Check the message above; existing inventory has not been deleted.";notice("Inventory could not load: "+e.message,true)}}}
 $("#products").addEventListener("click",async function(e){var b=e.target.closest("button[data-action]");if(!b)return;var a=b.dataset.action,id=b.dataset.id,patch={};if(a==="approve")patch={review_status:"approved",online_published:true,status:"in_stock"};if(a==="middle")patch={zone:"middle_retail",review_status:"needs_partner_review",online_published:false};if(a==="rear")patch={zone:"rear_restricted",review_status:"needs_partner_review",online_published:false};if(a==="sold")patch={status:"sold",online_published:false,quantity:0};try{await api("/api/admin/products/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify(patch)});notice("Item updated.");await loadProducts()}catch(err){notice(err.message,true)}});
 $("#inventorySearch").addEventListener("input",renderProducts);$("#inventoryZone").addEventListener("change",renderProducts);$("#inventoryReview").addEventListener("change",renderProducts);
-$("#itemForm").addEventListener("submit",async function(e){e.preventDefault();var v=function(id){return $("#"+id).value};var body={title:v("title"),author:v("author"),isbn:v("isbn"),category:v("category"),price:Number(v("price")),msrp:Number(v("msrp")),cost:Number(v("cost")),condition:v("condition"),zone:v("zone"),location:v("location"),quantity:Number(v("quantity")),stock_mode:v("stockMode"),tpv:Number(v("tpv")),cpv:Number(v("cpv")),market_comps:v("marketComps"),valuation_basis:v("valuationBasis"),valuation_confidence:v("valuationConfidence"),signed:$("#signed").checked,first_edition:$("#firstEdition").checked,special:$("#special").checked,image_url:v("image"),description:v("description"),notes:v("notes"),review_status:"needs_partner_review",online_published:false};var saveBtn=$("#saveItemButton");saveBtn.disabled=true;saveBtn.textContent="Saving item…";try{var d=await api("/api/admin/products",{method:"POST",body:JSON.stringify(body)});$("#itemForm").reset();["price","msrp","cost","tpv","cpv"].forEach(function(id){$("#"+id).value="0"});$("#quantity").value="1";$("#zone").value="middle_retail";$("#valuationBasis").value="none";$("#valuationConfidence").value="low";await loadProducts();setView("inventory");notice("Saved "+d.id+". Item is in inventory and stays private until approved.");}catch(err){notice(err.message,true)}finally{saveBtn.disabled=false;saveBtn.textContent="Save item to inventory →"}});
+
+var scanState={lastLookupBarcode:"",inFlightBarcode:"",duplicates:[],history:[],timer:null,metadataMatched:false};
+function cleanScanCode(value){return String(value||"").replace(/[^0-9xX]/g,"").toUpperCase();}
+function setScanStatus(message,tone){
+ var el=$("#scanLookupStatus");el.textContent=message||"";el.className="message"+(tone?" "+tone:"");if(!message)el.classList.add("hidden");
+}
+function median(values){var a=values.filter(function(x){return Number.isFinite(x)&&x>=0}).sort(function(x,y){return x-y});if(!a.length)return 0;var m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2;}
+function fillScanMetadata(book,barcode){
+ var year=parseInt(String(book.publicationYear||"").slice(0,4),10),cutoff=new Date().getFullYear()-30;
+ $("#isbn").value=barcode;
+ $("#title").value=[book.title,book.subtitle].filter(Boolean).join(": ");
+ $("#author").value=book.author||"";$("#publisher").value=book.publisher||"";
+ $("#publicationYear").value=book.publicationYear||"";$("#edition").value=book.edition||"";
+ $("#pageCount").value=book.pageCount||"";
+ var fmt=String(book.format||"");
+ var formatOptions=Array.from($("#format").options).map(function(o){return o.value||o.text});
+ $("#format").value=formatOptions.indexOf(fmt)>=0?fmt:"";
+ $("#language").value=book.language||"";$("#subjects").value=book.subjects||"";
+ $("#category").value="Book";$("#condition").value="Unknown — assess manually";
+ $("#price").value="0";$("#msrp").value="0";$("#cost").value="0";$("#cpv").value="0";$("#tpv").value="0";
+ $("#quantity").value="1";$("#stockMode").value="unique";
+ $("#valuationBasis").value="none";$("#valuationConfidence").value="low";
+ $("#signed").checked=false;$("#firstEdition").checked=false;$("#special").checked=false;
+ $("#marketComps").value="";$("#image").value=book.imageUrl||"";
+ $("#description").value=book.description||"";
+ $("#metadataSource").value=book.source||"";$("#metadataConfidence").value=book.confidence||"low";$("#metadataNotes").value=book.metadataNote||"";
+ $("#zone").value=year&&year<cutoff?"rear_restricted":"middle_retail";
+ if(!$("#description").value)$("#description").value="Bibliographic metadata matched to ISBN "+barcode+". Add a customer-facing description after checking this physical copy.";
+ $("#notes").value="Barcode identity is not a physical inspection. Verify condition, completeness, acquisition cost, actual format, signed/inscribed status, first printing and any unusual/special features before approval.";
+ if(year&&year<cutoff)$("#notes").value+=" This edition appears older than 30 years based on the edition publication year; it has been routed to Rear — restricted for partner review.";
+ scanState.metadataMatched=true;
+}
+function applyScanPricing(pricing){
+ if(!pricing||!pricing.ok||!pricing.result)return false;
+ var p=pricing.result,evidence=Array.isArray(p.marketEvidence)?p.marketEvidence:[];
+ if(p.msrp!==null)$("#msrp").value=String(p.msrp);
+ if(p.suggestedPrice!==null){$("#price").value=String(p.suggestedPrice);$("#tpv").value=String(p.suggestedPrice);}
+ var sold=evidence.filter(function(x){return x.status==="sold_record"&&x.price!==null&&Number.isFinite(Number(x.price))}).map(function(x){return Number(x.price)});
+ if(sold.length)$("#cpv").value=median(sold).toFixed(2);
+ $("#valuationBasis").value=p.valuationBasis==="sold_comps"?"sold_comps":p.valuationBasis==="catalog"?"catalog":"none";
+ $("#valuationConfidence").value=p.valuationConfidence||"low";
+ $("#marketComps").value=evidence.map(function(x){return [x.status,x.title,x.price===null?"price unknown":x.currency+" "+x.price,x.date,x.condition,x.url,x.comparability].filter(Boolean).join(" | ")}).join("\n");
+ if(p.notes)$("#notes").value+="\nAI price research: "+p.notes;
+ return true;
+}
+function renderScanHistory(){
+ $("#scanSessionCount").textContent=scanState.history.length+" saved";
+ $("#scanSessionRows").innerHTML=scanState.history.length?scanState.history.slice().reverse().map(function(x){
+  return '<div class="scan-history-item"><span><strong>'+esc(x.title)+'</strong><small>'+esc(x.isbn||"No barcode")+' · '+esc(x.zone)+' · '+esc(x.when)+'</small></span><span class="pill">'+esc(x.id)+'</span></div>';
+ }).join(""):'<p class="fieldnote">Saved items will appear here. Use “Save & scan next” to keep receiving without switching views.</p>';
+}
+async function loadScanSettings(){
+ try{
+  var data=await api("/api/admin/catalog/status"),control=$("#scanResearchPrices"),hint=$("#scanResearchHint");
+  control.disabled=!data.aiPricingConfigured;
+  var saved=localStorage.getItem("onecopy_auto_price_research")==="1";
+  control.checked=Boolean(data.aiPricingConfigured&&saved);
+  hint.textContent=data.aiPricingConfigured?"Optional AI web research is available. Enable it to search price/catalog sources for each scan; charges may apply.":"AI price research is not configured. Add OPENAI_API_KEY in Cloudflare to enable it; free bibliographic lookups still work.";
+ }catch(err){$("#scanResearchPrices").disabled=true;$("#scanResearchHint").textContent="Could not check AI pricing availability. Bibliographic scanning still works."}
+}
+$("#scanResearchPrices").addEventListener("change",function(){
+ if(this.checked&&!window.confirm("Enable AI web research for each item scanned? This can trigger a billable API request per item. You can switch it off at any time.")){this.checked=false;return;}
+ try{localStorage.setItem("onecopy_auto_price_research",this.checked?"1":"0")}catch{}
+});
+async function lookupBarcode(force){
+ var barcode=cleanScanCode($("#isbn").value);
+ if(barcode.length<8||barcode.length>14){setScanStatus("Scan or enter a barcode containing 8–14 digits, then look it up.","error");return null}
+ if(scanState.inFlightBarcode===barcode)return null;
+ if(scanState.lastLookupBarcode===barcode&&!force)return null;
+ scanState.lastLookupBarcode=barcode;scanState.inFlightBarcode=barcode;scanState.duplicates=[];
+ setScanStatus("Looking up exact book metadata"+($("#scanResearchPrices").checked?" and researching price evidence":"")+"…");
+ var button=$("#lookupBarcode");button.disabled=true;button.textContent="Looking up…";
+ try{
+  var data=await api("/api/admin/catalog/lookup",{method:"POST",body:JSON.stringify({barcode:barcode,researchPrices:$("#scanResearchPrices").checked})});
+  scanState.duplicates=Array.isArray(data.duplicates)?data.duplicates:[];
+  if(data.book&&data.book.found){
+   fillScanMetadata(data.book,barcode);
+   var pricingMessage="";
+   if($("#scanResearchPrices").checked){
+    if(data.pricing&&data.pricing.ok&&applyScanPricing(data.pricing))pricingMessage=" AI price research returned draft values; verify every source and physical condition.";
+    else if(data.pricing&&data.pricing.error)pricingMessage=" "+data.pricing.error;
+    else pricingMessage=" AI pricing research did not return a usable estimate; price fields were left blank.";
+   }
+   var age=String(data.book.publicationYear||"");
+   var message="Matched "+data.book.source+" · "+data.book.title+(data.book.author?" — "+data.book.author:"")+". Metadata filled; condition/cost/shelf and physical-copy flags still need checking."+pricingMessage;
+   if(age&&parseInt(age,10)<new Date().getFullYear()-30)message+=" Older edition routed to Rear — restricted.";
+   if(scanState.duplicates.length)message+=" WARNING: "+scanState.duplicates.length+" existing inventory record(s) use this barcode. Review before saving another copy.";
+   setScanStatus(message,scanState.duplicates.length?"error":"");
+  }else{
+   scanState.metadataMatched=false;
+   if(scanState.duplicates.length)setScanStatus("No exact book metadata match was found, but "+scanState.duplicates.length+" existing record(s) use this barcode. Check before creating another physical-copy record.","error");
+   else setScanStatus((data.book&&data.book.reason)||"No exact ISBN match. Enter the item manually or use AI Item Capture for a photo-assisted draft.","error");
+  }
+  if(scanState.duplicates.length){
+   var summary=scanState.duplicates.slice(0,5).map(function(x){return x.id+" · "+x.title+" · "+x.zone+(x.location?" / "+x.location:"")}).join(" ; ");
+   setScanStatus($("#scanLookupStatus").textContent+" Existing copies: "+summary+(scanState.duplicates.length>5?"; plus "+(scanState.duplicates.length-5)+" more.":""),"error");
+  }
+  return data;
+ }catch(err){setScanStatus("Lookup failed: "+err.message+". You can enter details manually and continue.","error");return null}
+ finally{scanState.inFlightBarcode="";button.disabled=false;button.textContent="Look up scan ↗"}
+}
+$("#lookupBarcode").addEventListener("click",function(){lookupBarcode(true)});
+$("#isbn").addEventListener("input",function(){
+ var code=cleanScanCode(this.value);
+ if(code.length<8||code.length>14||code===scanState.lastLookupBarcode)return;
+ if(scanState.timer)clearTimeout(scanState.timer);
+ scanState.timer=setTimeout(function(){lookupBarcode(false)},350);
+});
+$("#isbn").addEventListener("keydown",function(e){
+ if(e.key==="Enter"){e.preventDefault();if(scanState.timer)clearTimeout(scanState.timer);lookupBarcode(false)}
+});
+$("#resetForm").addEventListener("click",function(){
+ scanState.lastLookupBarcode="";scanState.duplicates=[];scanState.metadataMatched=false;
+ $("#condition").value="Unknown — assess manually";$("#valuationBasis").value="none";$("#valuationConfidence").value="low";
+ setScanStatus("");setTimeout(function(){$("#isbn").focus()},20);
+});
+$("#itemForm").addEventListener("submit",async function(e){
+ e.preventDefault();
+ var v=function(id){return $("#"+id).value},code=cleanScanCode(v("isbn"));
+ var duplicates=scanState.duplicates;
+ if(duplicates.length&&code&&code===scanState.lastLookupBarcode){
+  var list=duplicates.slice(0,4).map(function(x){return x.title+" ("+x.id+")"}).join("\n");
+  if(!window.confirm("OneCopy already contains "+duplicates.length+" item record(s) with this barcode:\n"+list+"\n\nMultiple physical copies can share an ISBN. Save this as another copy only if you have the physical book in hand and intend to create a separate record."))return;
+ }
+ var body={title:v("title"),author:v("author"),isbn:v("isbn"),category:v("category"),price:Number(v("price")),msrp:Number(v("msrp")),cost:Number(v("cost")),condition:v("condition"),zone:v("zone"),location:v("location"),quantity:Number(v("quantity")),stock_mode:v("stockMode"),tpv:Number(v("tpv")),cpv:Number(v("cpv")),market_comps:v("marketComps"),valuation_basis:v("valuationBasis"),valuation_confidence:v("valuationConfidence"),signed:$("#signed").checked,first_edition:$("#firstEdition").checked,special:$("#special").checked,image_url:v("image"),description:v("description"),notes:v("notes"),edition:v("edition"),publisher:v("publisher"),publication_year:v("publicationYear"),page_count:Number(v("pageCount")),format:v("format"),language:v("language"),subjects:v("subjects"),metadata_source:v("metadataSource"),metadata_confidence:v("metadataConfidence"),metadata_notes:v("metadataNotes"),review_status:"needs_partner_review",online_published:false};
+ var submitter=e.submitter||$("#saveItemButton"),mode=submitter.dataset.mode||"next";
+ var saveBtn=$("#saveItemButton"),finishBtn=$("#saveFinishButton"),retainLocation=$("#location").value,retainResearch=$("#scanResearchPrices").checked;
+ saveBtn.disabled=true;finishBtn.disabled=true;saveBtn.textContent="Saving item…";
+ try{
+  var result=await api("/api/admin/products",{method:"POST",body:JSON.stringify(body)});
+  scanState.history.push({id:result.id,title:body.title,isbn:body.isbn,zone:body.zone,when:new Date().toLocaleTimeString()});
+  if(scanState.history.length>30)scanState.history.shift();renderScanHistory();
+  $("#itemForm").reset();$("#scanResearchPrices").checked=retainResearch;
+  ["price","msrp","cost","tpv","cpv"].forEach(function(id){$("#"+id).value="0"});
+  $("#quantity").value="1";$("#zone").value="middle_retail";$("#location").value=retainLocation;
+  $("#condition").value="Unknown — assess manually";$("#valuationBasis").value="none";$("#valuationConfidence").value="low";
+  $("#stockMode").value="unique";$("#category").value="Book";
+  scanState.lastLookupBarcode="";scanState.duplicates=[];scanState.metadataMatched=false;
+  setScanStatus("");await loadProducts();notice("Saved "+result.id+". Record remains private until reviewed.");
+  if(mode==="finish")setView("inventory");else{setView("receive");setTimeout(function(){$("#isbn").focus()},60);}
+ }catch(err){notice(err.message,true)}
+ finally{saveBtn.disabled=false;finishBtn.disabled=false;saveBtn.textContent="Save & scan next →"}
+});
+
 async function loadOrders(){try{var d=await api("/api/admin/orders"),rows=d.orders||[];$("#orders").textContent=rows.length?rows.map(function(o){return o.id+" · "+o.status+" · "+fmt(o.total)}).join(" | "):"No orders recorded yet. Order checkout is not enabled in this build."}catch(e){$("#orders").textContent="Orders unavailable until order processing is configured."}}
 
 function ebayFormValues(){
