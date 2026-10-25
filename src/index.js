@@ -838,7 +838,7 @@ async function api(req,env,url){
    let pricing=null;
    if(b.researchPrices&&env.GEMINI_API_KEY&&book.found)pricing=await researchScannedBookPrice(book,env);
    else if(b.researchPrices&&!env.GEMINI_API_KEY)pricing={ok:false,error:"Gemini web price research is not configured. Add GEMINI_API_KEY as a Cloudflare Worker secret to enable it."};
-   return json({ok:true,barcode,book,duplicates:duplicateRows.results||[],pricing,collectible,aiPricingConfigured:Boolean(env.OPENAI_API_KEY),collectibleScreenConfigured:Boolean(env.GEMINI_API_KEY)});
+   return json({ok:true,barcode,book,duplicates:duplicateRows.results||[],pricing,collectible,aiPricingConfigured:Boolean(env.GEMINI_API_KEY),collectibleScreenConfigured:Boolean(env.GEMINI_API_KEY)});
   }
   if(p==="/api/admin/item-capture/status"&&method==="GET"){const provider=itemCaptureProvider(env);return json({configured:Boolean(provider),provider:provider||"none",model:provider==="gemini"?s(env.GEMINI_MODEL||"gemini-3.8-flash",100):provider==="openai"?s(env.OPENAI_MODEL||"gpt-4.1-mini",100):"",webResearchAvailable:provider==="openai"&&Boolean(env.OPENAI_API_KEY)});}
   if(p==="/api/admin/item-capture/analyze"&&method==="POST"){const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);return await analyzeItemCapture(b,env);}
