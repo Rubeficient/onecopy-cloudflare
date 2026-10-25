@@ -95,7 +95,7 @@
  <div class="btnline bulk-actions"><button class="btn secondary" id="bulkLookupButton" type="button" disabled>Look up metadata in paced batches</button><button class="btn" id="bulkSaveButton" type="button" disabled>Save all as private drafts →</button><button class="btn secondary" id="bulkClearButton" type="button">Clear batch</button><button class="btn text-button" id="bulkFocusScannerButton" type="button">Focus scanner input</button></div>
 </section>
 <form id="itemForm"><div class="formgrid">
-<div class="field wide scan-field"><label for="isbn">SCAN ISBN / UPC / BARCODE FIRST</label><div class="scan-row"><input id="isbn" maxlength="40" autocomplete="off" inputmode="numeric" placeholder="Scan a book ISBN barcode" aria-describedby="scanHint"><button class="btn secondary" id="lookupBarcode" type="button">Look up scan ↗</button></div><span id="scanHint" class="fieldnote">A USB scanner can type here like a keyboard. Lookups start automatically after a barcode is entered.</span><div id="scanLookupStatus" class="message hidden" role="status" aria-live="polite"></div><input id="metadataSource" type="hidden"><input id="metadataConfidence" type="hidden"><input id="metadataNotes" type="hidden"></div>
+<div class="field wide scan-field"><label for="isbn">SCAN ISBN / UPC / BARCODE FIRST</label><div class="scan-row"><input id="isbn" maxlength="40" autocomplete="off" inputmode="numeric" placeholder="Scan a book ISBN barcode" aria-describedby="scanHint"><button class="btn secondary" id="lookupBarcode" type="button">Look up scan ↗</button></div><span id="scanHint" class="fieldnote">A USB scanner can type here like a keyboard. Lookups start automatically after a barcode is entered.</span><div id="scanLookupStatus" class="message hidden" role="status" aria-live="polite"></div><div id="collectibleAlert" class="collectible-alert hidden" role="status" aria-live="polite"></div><input id="metadataSource" type="hidden"><input id="metadataConfidence" type="hidden"><input id="metadataNotes" type="hidden"></div>
 <div class="field"><label for="title">TITLE / ITEM NAME</label><input id="title" maxlength="300" placeholder="Filled from exact book match when available"><span class="fieldnote">If no exact match is found, leave this blank. The barcode-only draft can be identified by the manager later.</span></div><div class="field"><label for="author">AUTHOR / MAKER</label><input id="author" maxlength="300" placeholder="Author, artist or brand"></div>
 <div class="field"><label for="publisher">PUBLISHER</label><input id="publisher" maxlength="500" placeholder="Publisher or imprint"></div><div class="field"><label for="publicationYear">EDITION PUBLICATION YEAR</label><input id="publicationYear" maxlength="40" placeholder="Year for this edition"></div>
 <div class="field"><label for="edition">EDITION / PRINTING NOTES</label><input id="edition" maxlength="500" placeholder="Only if verified"></div><div class="field"><label for="pageCount">PAGE COUNT</label><input id="pageCount" type="number" min="0" step="1" placeholder="Pages"></div>
@@ -742,7 +742,8 @@ function renderBulkQueue(){
   var title=item.book&&item.book.found?[item.book.title,item.book.subtitle].filter(Boolean).join(": "):"SCAN PENDING: manager identification";
   var status=item.state==="matched"?"Metadata matched":item.state==="missing"?"No catalogue match":item.state==="looking"?"Looking up…":item.state==="error"?"Lookup error":"Awaiting lookup";
   var warning=(item.duplicates&&item.duplicates.length)?" · "+item.duplicates.length+" existing record(s)":(counts[item.barcode]>1?" · "+counts[item.barcode]+" copies in this batch":"");
-  return '<div class="bulk-queue-item"><div class="bulk-queue-main"><strong>'+esc(item.barcode)+'</strong><span>'+esc(title)+'</span><small>'+esc(status+warning)+'</small></div><button class="icon-button" type="button" data-bulk-remove="'+item.key+'" aria-label="Remove scan '+esc(item.barcode)+'">×</button></div>';
+  var alert=item.collectible&&item.collectible.riskLevel!=="routine"?"<strong class='collectible-mini-alert'>"+(item.collectible.riskLevel==="high_alert"?"HIGH COLLECTIBLE ALERT":"INSPECT COPY")+" · "+esc((item.collectible.reasons||[]).slice(0,2).join("; ")||item.collectible.summary||"Manual review recommended")+"</strong>":"";
+  return '<div class="bulk-queue-item"><div class="bulk-queue-main"><strong>'+esc(item.barcode)+'</strong><span>'+esc(title)+'</span><small>'+esc(status+warning)+'</small>'+alert+'</div><button class="icon-button" type="button" data-bulk-remove="'+item.key+'" aria-label="Remove scan '+esc(item.barcode)+'">×</button></div>';
  }).join("")+(bulkQueue.length>60?'<p class="fieldnote">Showing the latest 60 of '+bulkQueue.length+' queued scans. All queued items will be processed.</p>':"");
 }
 function isBarcodeToken(value){var code=cleanScanCode(value);return code.length>=8&&code.length<=14?code:"";}
@@ -842,6 +843,7 @@ async function lookupBulkQueue(){
     else{data=await api("/api/admin/catalog/lookup",{method:"POST",body:JSON.stringify({barcode:item.barcode,researchPrices:false})});cache.set(item.barcode,data);}
     item.book=data.book&&data.book.found?data.book:null;
     item.duplicates=Array.isArray(data.duplicates)?data.duplicates:[];
+    item.collectible=data.collectible||null;
     item.state=item.book?"matched":"missing";
     item.error=item.book?"":(data.book&&data.book.reason||"No exact catalog match.");
    }catch(err){item.state="error";item.error=err.message||"Lookup failed";}
@@ -957,6 +959,18 @@ $("#scanResearchPrices").addEventListener("change",function(){
  if(this.checked&&!window.confirm("Enable AI web research for each item scanned? This can trigger a billable API request per item. You can switch it off at any time.")){this.checked=false;return;}
  try{localStorage.setItem("onecopy_auto_price_research",this.checked?"1":"0")}catch{}
 });
+function renderCollectibleAlert(result){
+ var box=$("#collectibleAlert");if(!box)return;
+ if(!result){box.className="collectible-alert hidden";box.innerHTML="";return;}
+ var level=result.riskLevel||"inspect",label=level==="high_alert"?"HIGH COLLECTIBLE ALERT":level==="inspect"?"INSPECT THIS COPY":"Routine screen";
+ var cls=level==="high_alert"?"high":level==="inspect"?"review":"routine";
+ var reasons=Array.isArray(result.reasons)?result.reasons:[],checks=Array.isArray(result.manualChecks)?result.manualChecks:[];
+ box.className="collectible-alert "+cls;
+ box.innerHTML='<div class="collectible-alert-head"><strong>'+esc(label)+'</strong><span>AI triage · not an appraisal</span></div><p>'+esc(result.summary||"Review the reasons and physical checks below.")+'</p>'+
+  (reasons.length?'<strong>Why it was flagged</strong><ul>'+reasons.map(function(x){return "<li>"+esc(x)+"</li>"}).join("")+"</ul>":"")+
+  (checks.length?'<strong>Staff inspection checklist</strong><ul>'+checks.map(function(x){return "<li>"+esc(x)+"</li>"}).join("")+"</ul>":"")+
+  '<p class="collectible-caveat">This scan cannot verify the physical printing, signature, authenticity, condition or provenance. Check the copy itself and research exact-edition sold comparables before setting a premium price.</p>';
+}
 async function lookupBarcode(force){
  var barcode=cleanScanCode($("#isbn").value);
  if(barcode.length<8||barcode.length>14){setScanStatus("Scan or enter a barcode containing 8–14 digits, then look it up.","error");return null}
@@ -968,6 +982,7 @@ async function lookupBarcode(force){
  try{
   var data=await api("/api/admin/catalog/lookup",{method:"POST",body:JSON.stringify({barcode:barcode,researchPrices:$("#scanResearchPrices").checked})});
   scanState.duplicates=Array.isArray(data.duplicates)?data.duplicates:[];
+  renderCollectibleAlert(data.collectible||null);
   if(data.book&&data.book.found){
    fillScanMetadata(data.book,barcode);
    var pricingMessage="";
@@ -1448,4 +1463,10 @@ $("#ebayListings").addEventListener("click",async function(e){
  catch(err){notice(err.message,true);btn.disabled=false;btn.textContent="Withdraw listing"}
 });
 
-</script><script src="/price-matrix.js"></script><script src="/admin-polish.js"></script></body></html>
+</script><script src="/price-matrix.js"></script><script src="/admin-polish.js"></script><style>
+.collectible-alert{margin:12px 0;padding:14px 16px;border:1px solid #c88d34;border-left:5px solid #c88d34;border-radius:12px;background:#fff8e9;color:#2b251c;font-size:14px}
+.collectible-alert.hidden{display:none}.collectible-alert.high{border-color:#b23b30;background:#fff0ed}.collectible-alert.routine{border-color:#4b8766;background:#eff8f1}
+.collectible-alert-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.collectible-alert-head strong{font-size:14px;letter-spacing:.04em}.collectible-alert-head span,.collectible-caveat{font-size:12px;opacity:.8}
+.collectible-alert p{margin:8px 0}.collectible-alert ul{margin:6px 0 10px;padding-left:22px}.collectible-alert li{margin:4px 0}.collectible-mini-alert{display:block;margin-top:5px;color:#9c3028;font-size:12px}
+</style>
+</body></html>
