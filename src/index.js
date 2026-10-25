@@ -757,6 +757,42 @@ async function researchScannedBookPrice(book,env){
  return {ok:true,result,researchSources,disclaimer:"Price results are research suggestions, not a formal appraisal. Confirm exact edition, physical condition and source records before setting a final price."};
 }
 
+
+const COLLECTIBLE_SCAN_SCHEMA={type:"object",additionalProperties:false,required:["riskLevel","riskScore","possibleSpecial","reasons","manualChecks","editionClues","marketResearchRecommended","summary"],properties:{riskLevel:{type:"string",enum:["routine","inspect","high_alert"]},riskScore:{type:"integer",minimum:0,maximum:100},possibleSpecial:{type:"boolean"},reasons:{type:"array",items:{type:"string"}},manualChecks:{type:"array",items:{type:"string"}},editionClues:{type:"array",items:{type:"string"}},marketResearchRecommended:{type:"boolean"},summary:{type:"string"}}};
+async function assessScannedBookCollectible(book,env){
+ if(!env.GEMINI_API_KEY)return {configured:false,riskLevel:"inspect",riskScore:0,possibleSpecial:false,reasons:["Gemini collectible screening is not configured; this book has not received an AI exception check."],manualChecks:["Inspect suspicious printing, signature, dust-jacket or provenance clues manually."],editionClues:[],marketResearchRecommended:false,summary:"Collectible screening unavailable."};
+ const barcode=cleanBarcode(book&& (book.barcode||book.isbn)||"");
+ if(!book||!book.found||!book.title)return {configured:true,riskLevel:"inspect",riskScore:0,possibleSpecial:false,reasons:["No exact bibliographic match was found, so collectible risk cannot be assessed reliably."],manualChecks:["Set this barcode-only draft aside for manual identification if the physical book looks old, unusual or collectible."],editionClues:[],marketResearchRecommended:true,summary:"Manual identification needed before collectible screening."};
+ try{
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS collectible_scan_cache (barcode TEXT PRIMARY KEY, result_json TEXT NOT NULL, checked_at TEXT NOT NULL, expires_at TEXT NOT NULL)").run();
+  const cached=await env.DB.prepare("SELECT result_json,expires_at FROM collectible_scan_cache WHERE barcode=?").bind(barcode).first();
+  if(cached&&Date.parse(cached.expires_at)>Date.now())return {...JSON.parse(cached.result_json),configured:true,cached:true};
+ }catch{}
+ const prompt=[
+  "You are OneCopy's collectible-risk screening assistant for a used bookstore. This is triage, not an appraisal, authentication, or web search.",
+  "Determine whether this bibliographic record has known or plausible collectible exceptions that staff should inspect before routine mass-market pricing.",
+  "Book: title="+s(book.title,300)+"; subtitle="+s(book.subtitle,300)+"; author="+s(book.author,200)+"; publisher="+s(book.publisher,200)+"; publication year="+s(book.publicationYear,40)+"; edition="+s(book.edition,200)+"; format="+s(book.format,100)+"; pages="+s(book.pageCount,30)+"; ISBN="+barcode+".",
+  "Physical condition, signatures, printing number line, dust jacket, completeness, provenance, and authenticity are unknown. Never assert this specific copy is signed or first printing from an ISBN.",
+  "Use general knowledge to flag known books/editions with important first-printing distinctions, unusually scarce early printings, notable publication-history exceptions, signed/limited editions, or titles where a first printing may be materially more valuable than a routine copy. A popular title alone is not enough. Early printings of The Da Vinci Code can warrant closer inspection, but do not assume any scanned copy is rare.",
+  "Do not invent exact sale prices, sold records, current listings, URLs, or market evidence; no live web search is available in this request. Do not assign a dollar valuation. If uncertain, say so and recommend exact-edition sold-comparable research or specialist review.",
+  "routine means no obvious bibliographic red flag; inspect means staff should check physical details or research market evidence; high_alert means a plausible known exception or potentially large collectible premium if verified. Be conservative but do not miss plausible value traps.",
+  "For books, manualChecks should include checking copyright page/number line, first edition/printing statement, publisher/imprint, dust-jacket price and condition, signature location/authenticity, and edition-specific sold comparables when relevant.",
+  "Return JSON only. Keep reasons and checks concise and actionable."
+ ].join("\n");
+ const model=s(env.GEMINI_MODEL||"gemini-2.5-flash",100);
+ let response;
+ try{response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{temperature:0.1,responseMimeType:"application/json",responseSchema:COLLECTIBLE_SCAN_SCHEMA,maxOutputTokens:1400}})});}
+ catch{return {configured:true,riskLevel:"inspect",riskScore:0,possibleSpecial:false,reasons:["Gemini could not be reached. No AI collectible result was produced."],manualChecks:["If the book looks old, unusual, signed or scarce, route it for manual review."],editionClues:[],marketResearchRecommended:true,summary:"Collectible check failed; manual review remains available."};}
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)return {configured:true,riskLevel:"inspect",riskScore:0,possibleSpecial:false,reasons:[response.status===429?"Gemini quota/rate limit reached; retry later.":"Gemini collectible screening failed (HTTP "+response.status+")."],manualChecks:["Do not treat a failed check as evidence that the book is ordinary."],editionClues:[],marketResearchRecommended:true,summary:"Collectible check unavailable; manual review remains available."};
+ const output=(data.candidates||[]).flatMap(x=>x.content&&Array.isArray(x.content.parts)?x.content.parts:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
+ let raw;try{raw=JSON.parse(output);}catch{return {configured:true,riskLevel:"inspect",riskScore:0,possibleSpecial:false,reasons:["Gemini returned an unreadable screening result."],manualChecks:["Do not treat an unreadable check as evidence that the book is ordinary."],editionClues:[],marketResearchRecommended:true,summary:"Collectible check needs retry."};}
+ const levels=["routine","inspect","high_alert"],result={configured:true,cached:false,provider:"gemini",model,riskLevel:levels.includes(raw.riskLevel)?raw.riskLevel:"inspect",riskScore:Math.max(0,Math.min(100,Math.round(Number(raw.riskScore)||0))),possibleSpecial:Boolean(raw.possibleSpecial),reasons:(Array.isArray(raw.reasons)?raw.reasons:[]).slice(0,6).map(x=>s(x,300)),manualChecks:(Array.isArray(raw.manualChecks)?raw.manualChecks:[]).slice(0,8).map(x=>s(x,300)),editionClues:(Array.isArray(raw.editionClues)?raw.editionClues:[]).slice(0,6).map(x=>s(x,300)),marketResearchRecommended:Boolean(raw.marketResearchRecommended),summary:s(raw.summary,700)};
+ if(result.riskLevel==="high_alert"||result.riskLevel==="inspect")result.possibleSpecial=true;
+ try{const now=new Date(),expires=new Date(Date.now()+14*24*60*60*1000);await env.DB.prepare("INSERT INTO collectible_scan_cache (barcode,result_json,checked_at,expires_at) VALUES (?,?,?,?) ON CONFLICT(barcode) DO UPDATE SET result_json=excluded.result_json,checked_at=excluded.checked_at,expires_at=excluded.expires_at").bind(barcode,JSON.stringify(result),now.toISOString(),expires.toISOString()).run();}catch{}
+ return result;
+}
+
 async function api(req,env,url){
  const p=url.pathname,method=req.method.toUpperCase();
 
@@ -779,16 +815,17 @@ async function api(req,env,url){
   await ensureSchema(env);
 
 
-  if(p==="/api/admin/catalog/status"&&method==="GET"){const provider=itemCaptureProvider(env);return json({aiPricingConfigured:Boolean(env.OPENAI_API_KEY),pricingProvider:env.OPENAI_API_KEY?"openai":"none",captureConfigured:Boolean(provider),captureProvider:provider||"none",captureModel:provider==="gemini"?s(env.GEMINI_MODEL||"gemini-3.8-flash",100):provider==="openai"?s(env.OPENAI_MODEL||"gpt-4.1-mini",100):"",model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});}
+  if(p==="/api/admin/catalog/status"&&method==="GET"){const provider=itemCaptureProvider(env);return json({aiPricingConfigured:Boolean(env.OPENAI_API_KEY),pricingProvider:env.OPENAI_API_KEY?"openai":"none",collectibleScreenConfigured:Boolean(env.GEMINI_API_KEY),collectibleScreenProvider:env.GEMINI_API_KEY?"gemini":"none",collectibleScreenModel:s(env.GEMINI_MODEL||"gemini-2.5-flash",100),captureConfigured:Boolean(provider),captureProvider:provider||"none",captureModel:provider==="gemini"?s(env.GEMINI_MODEL||"gemini-3.8-flash",100):provider==="openai"?s(env.OPENAI_MODEL||"gpt-4.1-mini",100):"",model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});}
   if(p==="/api/admin/catalog/lookup"&&method==="POST"){
    const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);
    const barcode=cleanBarcode(b.barcode);if(barcode.length<8||barcode.length>14)return json({error:"Scan an ISBN or barcode of 8–14 digits."},400);
    const book=await lookupBookByBarcode(barcode,env);
    const duplicateRows=await env.DB.prepare("SELECT id,title,author,isbn,condition,price,zone,location,created_at FROM products WHERE REPLACE(REPLACE(UPPER(isbn),'-',''),' ','')=? OR isbn LIKE ? ORDER BY created_at DESC LIMIT 12").bind(barcode,"%"+barcode+"%").all();
+   const collectible=await assessScannedBookCollectible(book,env);
    let pricing=null;
    if(b.researchPrices&&env.OPENAI_API_KEY&&book.found)pricing=await researchScannedBookPrice(book,env);
    else if(b.researchPrices&&!env.OPENAI_API_KEY)pricing={ok:false,error:"AI price research is not configured. Add OPENAI_API_KEY in Cloudflare to enable this optional, potentially billable feature."};
-   return json({ok:true,barcode,book,duplicates:duplicateRows.results||[],pricing,aiPricingConfigured:Boolean(env.OPENAI_API_KEY)});
+   return json({ok:true,barcode,book,duplicates:duplicateRows.results||[],pricing,collectible,aiPricingConfigured:Boolean(env.OPENAI_API_KEY),collectibleScreenConfigured:Boolean(env.GEMINI_API_KEY)});
   }
   if(p==="/api/admin/item-capture/status"&&method==="GET"){const provider=itemCaptureProvider(env);return json({configured:Boolean(provider),provider:provider||"none",model:provider==="gemini"?s(env.GEMINI_MODEL||"gemini-3.8-flash",100):provider==="openai"?s(env.OPENAI_MODEL||"gpt-4.1-mini",100):"",webResearchAvailable:provider==="openai"&&Boolean(env.OPENAI_API_KEY)});}
   if(p==="/api/admin/item-capture/analyze"&&method==="POST"){const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);return await analyzeItemCapture(b,env);}
