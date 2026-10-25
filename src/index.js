@@ -723,27 +723,36 @@ const SCANNED_BOOK_PRICE_SCHEMA={
  }
 };
 async function researchScannedBookPrice(book,env){
+ if(!env.GEMINI_API_KEY)return {ok:false,error:"Gemini web price research is not configured. Add GEMINI_API_KEY as a Cloudflare Worker secret."};
+ const barcode=cleanBarcode(book&& (book.barcode||book.isbn)||"");
+ if(!book||!book.found||!book.title||!barcode)return {ok:false,error:"An exact ISBN metadata match is required before price research."};
+ try{
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS book_price_research_cache (barcode TEXT PRIMARY KEY, result_json TEXT NOT NULL, checked_at TEXT NOT NULL, expires_at TEXT NOT NULL)").run();
+  const cached=await env.DB.prepare("SELECT result_json,expires_at FROM book_price_research_cache WHERE barcode=?").bind(barcode).first();
+  if(cached&&Date.parse(cached.expires_at)>Date.now()){try{return {...JSON.parse(cached.result_json),cached:true};}catch{}}
+ }catch{}
  const prompt=[
-  "You are a cautious used-book cataloging and market-research assistant for an independent bookstore in Pomona, California.",
-  "Research the exact edition identified by this barcode; do not substitute another edition, format, translation or a modern reprint for an older original.",
-  "Bibliographic record: ISBN/barcode="+book.barcode+"; title="+book.title+"; subtitle="+(book.subtitle||"unknown")+"; author="+(book.author||"unknown")+"; publisher="+(book.publisher||"unknown")+"; edition publication year="+(book.publicationYear||"unknown")+"; format="+(book.format||"unknown")+"; pages="+(book.pageCount||"unknown")+".",
-  "The physical copy's condition, completeness, signatures, first printing, provenance and acquisition cost are unknown. Do not assume As New condition or authenticity.",
-  "Use web search to find exact-edition publisher/retail cover-price evidence, relevant active listings, and completed/sold records. Never invent URLs, prices, sold dates, sellers or comps. Clearly distinguish sold records from active asking prices.",
-  "Only fill MSRP when there is evidence of a printed cover price or publisher suggested retail price for this exact format/edition; do not use ebook sale prices as print MSRP. Only estimate a market range when evidence genuinely supports it. If evidence is thin or the edition/condition materially changes value, use null prices and recommend review.",
-  "SuggestedPrice is only a draft asking-price suggestion, not an appraisal. Prefer sold records for comparable-price value. Report source URLs and currency.",
-  "Today is "+new Date().toISOString().slice(0,10)+". Return structured data only."
+  "You are OneCopy's cautious used-book market research assistant for an independent bookstore in Pomona, California.",
+  "Use Google Search grounding to research the exact edition identified by this ISBN. Search the publisher or reputable catalog for printed cover-price/MSRP evidence, current active listings, and completed/sold records when publicly available.",
+  "Book: ISBN="+barcode+"; title="+s(book.title,300)+"; subtitle="+s(book.subtitle,300)+"; author="+s(book.author,200)+"; publisher="+s(book.publisher,200)+"; publication year="+s(book.publicationYear,40)+"; format="+s(book.format,100)+"; pages="+s(book.pageCount,30)+".",
+  "Do not substitute another edition, format, translation, ebook or modern reprint. The physical copy's condition, completeness, signature, first printing, provenance and acquisition cost are unknown. Do not assume As New condition or authenticity.",
+  "Never invent prices, sale dates, sellers, source URLs or evidence. Distinguish active asking prices from confirmed sold records. Do not treat an active asking price as a sale. Only set MSRP when evidence supports a printed cover price or publisher suggested retail price for this exact print edition.",
+  "Use null for any price unsupported by evidence. Market range and suggested price must account for the limits of the evidence and unknown condition; if evidence is thin or editions differ, leave prices null and set needsReview=true. SuggestedPrice is a draft asking price, not an appraisal.",
+  "Return JSON only matching the provided schema. Use USD when evidence is in US dollars; preserve source currency otherwise. Include source URLs in marketEvidence only when actually found. Summarize important evidence gaps in notes.",
+  "Research date: "+new Date().toISOString().slice(0,10)+"."
  ].join("\n");
+ const model=s(env.GEMINI_PRICE_MODEL||env.GEMINI_MODEL||"gemini-2.5-flash",100);
  let response;
  try{
-  response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"authorization":"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},body:JSON.stringify({model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100),tools:[{type:"web_search"}],tool_choice:"required",include:["web_search_call.action.sources"],input:[{role:"user",content:[{type:"input_text",text:prompt}]}],text:{format:{type:"json_schema",name:"onecopy_scanned_book_price",strict:true,schema:SCANNED_BOOK_PRICE_SCHEMA}},max_output_tokens:2200})});
- }catch{return {ok:false,error:"Could not reach the AI research service. Bibliographic metadata was still retrieved."};}
+  response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],tools:[{google_search:{}}],generationConfig:{temperature:0.1,responseMimeType:"application/json",responseSchema:SCANNED_BOOK_PRICE_SCHEMA,maxOutputTokens:2600}})});
+ }catch{return {ok:false,error:"Could not reach Gemini web price research. Bibliographic metadata was still retrieved."};}
  const providerData=await response.json().catch(()=>({}));
  if(!response.ok){
-  const detail=response.status===429?"The AI research usage limit was reached.":response.status===401||response.status===403?"The AI provider rejected the configured key or model access.":"The AI price research request failed (HTTP "+response.status+").";
+  const detail=response.status===429?"Gemini quota/rate limit reached; retry later.":response.status===401||response.status===403?"Gemini rejected the configured API key or model access.":"Gemini web price research failed (HTTP "+response.status+").";
   return {ok:false,error:detail+" Bibliographic metadata was still retrieved."};
  }
- const output=(providerData.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==="output_text"&&typeof x.text==="string").map(x=>x.text).join("\n");
- let result;try{result=JSON.parse(output);}catch{return {ok:false,error:"AI price research returned an invalid result. Bibliographic metadata was still retrieved."};}
+ const output=(providerData.candidates||[]).flatMap(x=>x.content&&Array.isArray(x.content.parts)?x.content.parts:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
+ let result;try{result=JSON.parse(output);}catch{return {ok:false,error:"Gemini web research returned an unreadable price result. No prices were applied."};}
  for(const key of ["msrp","estimatedLow","estimatedHigh","suggestedPrice"]){const n=Number(result[key]);result[key]=result[key]===null||result[key]===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100;}
  if(!["sold_comps","active_listings","catalog","none"].includes(result.valuationBasis))result.valuationBasis="none";
  if(!["low","medium","high"].includes(result.valuationConfidence))result.valuationConfidence="low";
@@ -753,8 +762,12 @@ async function researchScannedBookPrice(book,env){
   const n=Number(x.price);
   return {title:s(x.title,250),seller:s(x.seller,160),price:x.price===null||x.price===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100,currency:s(x.currency||"USD",10),condition:s(x.condition,100),status:["active_listing","sold_record","catalog_reference","unknown"].includes(x.status)?x.status:"unknown",url,date:s(x.date,80),comparability:s(x.comparability,350)};
  });
- const researchSources=(providerData.output||[]).filter(x=>x.type==="web_search_call").flatMap(x=>x.action&&Array.isArray(x.action.sources)?x.action.sources:[]).map(x=>{let url="";try{const u=new URL(String(x.url||""));if(u.protocol==="https:"||u.protocol==="http:")url=u.toString();}catch{}return {title:s(x.title||url,250),url};}).filter(x=>x.url).slice(0,12);
- return {ok:true,result,researchSources,disclaimer:"Price results are research suggestions, not a formal appraisal. Confirm exact edition, physical condition and source records before setting a final price."};
+ const groundedSources=(providerData.candidates||[]).flatMap(x=>x.groundingMetadata&&Array.isArray(x.groundingMetadata.groundingChunks)?x.groundingMetadata.groundingChunks:[]).map(x=>x.web&&x.web.uri?{title:s(x.web.title||x.web.uri,250),url:x.web.uri}:null).filter(x=>x&&/^https?:\/\//i.test(x.url)).slice(0,12);
+ const seen=new Set(result.marketEvidence.map(x=>x.url).filter(Boolean));
+ for(const source of groundedSources){if(!seen.has(source.url)&&result.marketEvidence.length<8){result.marketEvidence.push({title:source.title,seller:"",price:null,currency:"USD",condition:"",status:"unknown",url:source.url,date:"",comparability:"Grounded search source; inspect page to confirm exact edition, price and sale status."});seen.add(source.url);}}
+ const resultBundle={ok:true,result,researchSources:groundedSources,provider:"gemini",model,disclaimer:"Gemini-grounded price research is a research aid, not a formal appraisal. Confirm exact edition, physical condition and source records before setting a final price."};
+ try{const now=new Date(),expires=new Date(Date.now()+7*24*60*60*1000);await env.DB.prepare("INSERT INTO book_price_research_cache (barcode,result_json,checked_at,expires_at) VALUES (?,?,?,?) ON CONFLICT(barcode) DO UPDATE SET result_json=excluded.result_json,checked_at=excluded.checked_at,expires_at=excluded.expires_at").bind(barcode,JSON.stringify(resultBundle),now.toISOString(),expires.toISOString()).run();}catch{}
+ return resultBundle;
 }
 
 
@@ -815,7 +828,7 @@ async function api(req,env,url){
   await ensureSchema(env);
 
 
-  if(p==="/api/admin/catalog/status"&&method==="GET"){const provider=itemCaptureProvider(env);return json({aiPricingConfigured:Boolean(env.OPENAI_API_KEY),pricingProvider:env.OPENAI_API_KEY?"openai":"none",collectibleScreenConfigured:Boolean(env.GEMINI_API_KEY),collectibleScreenProvider:env.GEMINI_API_KEY?"gemini":"none",collectibleScreenModel:s(env.GEMINI_MODEL||"gemini-2.5-flash",100),captureConfigured:Boolean(provider),captureProvider:provider||"none",captureModel:provider==="gemini"?s(env.GEMINI_MODEL||"gemini-3.8-flash",100):provider==="openai"?s(env.OPENAI_MODEL||"gpt-4.1-mini",100):"",model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});}
+  if(p==="/api/admin/catalog/status"&&method==="GET"){const provider=itemCaptureProvider(env);return json({aiPricingConfigured:Boolean(env.GEMINI_API_KEY),pricingProvider:env.GEMINI_API_KEY?"gemini":"none",collectibleScreenConfigured:Boolean(env.GEMINI_API_KEY),collectibleScreenProvider:env.GEMINI_API_KEY?"gemini":"none",collectibleScreenModel:s(env.GEMINI_MODEL||"gemini-2.5-flash",100),captureConfigured:Boolean(provider),captureProvider:provider||"none",captureModel:provider==="gemini"?s(env.GEMINI_MODEL||"gemini-3.8-flash",100):provider==="openai"?s(env.OPENAI_MODEL||"gpt-4.1-mini",100):"",model:s(env.OPENAI_MODEL||"gpt-4.1-mini",100)});}
   if(p==="/api/admin/catalog/lookup"&&method==="POST"){
    const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);
    const barcode=cleanBarcode(b.barcode);if(barcode.length<8||barcode.length>14)return json({error:"Scan an ISBN or barcode of 8–14 digits."},400);
@@ -823,8 +836,8 @@ async function api(req,env,url){
    const duplicateRows=await env.DB.prepare("SELECT id,title,author,isbn,condition,price,zone,location,created_at FROM products WHERE REPLACE(REPLACE(UPPER(isbn),'-',''),' ','')=? OR isbn LIKE ? ORDER BY created_at DESC LIMIT 12").bind(barcode,"%"+barcode+"%").all();
    const collectible=await assessScannedBookCollectible(book,env);
    let pricing=null;
-   if(b.researchPrices&&env.OPENAI_API_KEY&&book.found)pricing=await researchScannedBookPrice(book,env);
-   else if(b.researchPrices&&!env.OPENAI_API_KEY)pricing={ok:false,error:"AI price research is not configured. Add OPENAI_API_KEY in Cloudflare to enable this optional, potentially billable feature."};
+   if(b.researchPrices&&env.GEMINI_API_KEY&&book.found)pricing=await researchScannedBookPrice(book,env);
+   else if(b.researchPrices&&!env.GEMINI_API_KEY)pricing={ok:false,error:"Gemini web price research is not configured. Add GEMINI_API_KEY as a Cloudflare Worker secret to enable it."};
    return json({ok:true,barcode,book,duplicates:duplicateRows.results||[],pricing,collectible,aiPricingConfigured:Boolean(env.OPENAI_API_KEY),collectibleScreenConfigured:Boolean(env.GEMINI_API_KEY)});
   }
   if(p==="/api/admin/item-capture/status"&&method==="GET"){const provider=itemCaptureProvider(env);return json({configured:Boolean(provider),provider:provider||"none",model:provider==="gemini"?s(env.GEMINI_MODEL||"gemini-3.8-flash",100):provider==="openai"?s(env.OPENAI_MODEL||"gpt-4.1-mini",100):"",webResearchAvailable:provider==="openai"&&Boolean(env.OPENAI_API_KEY)});}
