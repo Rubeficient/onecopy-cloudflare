@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "onecopy-commerce",
+  "name": "onecopy-cloudflare",
   "main": "src/index.js",
   "compatibility_date": "2026-10-17",
   "assets": {
