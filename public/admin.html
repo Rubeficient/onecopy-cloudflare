@@ -697,6 +697,7 @@ function renderProducts(){
  $("#products").innerHTML=rows.length?rows.map(function(p){
   var actions="",ready=productReady(p),needsIdentity=!String(p.title||"").trim()||/^SCAN PENDING:/i.test(String(p.title||""));
   actions+='<button class="btn secondary" data-action="edit" data-id="'+esc(p.id)+'">Edit details</button>';
+  actions+='<button class="btn gold" data-action="price-check" data-id="'+esc(p.id)+'">Price check</button>';
   if(!p.online_published)actions+='<button class="btn" data-action="approve" data-id="'+esc(p.id)+'" '+(!ready?'disabled title="Complete title, condition, price and retail zone in Edit details first"':"")+'>Approve & publish</button>';
   actions+='<button class="btn secondary" data-action="middle" data-id="'+esc(p.id)+'">Move to Middle</button><button class="btn secondary" data-action="rear" data-id="'+esc(p.id)+'">Restrict</button>';
   if(p.status!=="sold")actions+='<button class="btn danger" data-action="sold" data-id="'+esc(p.id)+'">Mark sold</button>';
@@ -706,11 +707,39 @@ function renderProducts(){
  }).join(""):'<tr><td colspan="5" class="emptyrow">No matching records. Try another search, or receive your first item.</td></tr>';
  $("#inventoryFooter").textContent="Showing "+rows.length+" of "+inventoryRows.length+" inventory records.";
 }
+async function runInventoryPriceCheck(id,button){
+ var item=inventoryRows.find(function(p){return p.id===id});if(!item)return;
+ var old=button.textContent;button.disabled=true;button.textContent="Researching…";
+ try{
+  var data=await api("/api/admin/products/"+encodeURIComponent(id)+"/price-check",{method:"POST",body:JSON.stringify({})});
+  var pricing=data.pricing,result=pricing&&pricing.ok&&pricing.result?pricing.result:null;
+  if(!pricing||!pricing.ok){window.alert("Price check failed for "+item.title+":\n"+(pricing&&pricing.error||"No result returned."));return;}
+  var evidence=Array.isArray(result.marketEvidence)?result.marketEvidence:[];
+  var lines=["PRICE CHECK · "+item.title,"ISBN: "+(item.isbn||"not set"),"","Suggested asking price: "+(result.suggestedPrice===null?"Not supported":fmt(result.suggestedPrice)),"Printed MSRP: "+(result.msrp===null?"Not verified":fmt(result.msrp)),"Estimated range: "+(result.estimatedLow===null&&result.estimatedHigh===null?"Not supported":(result.estimatedLow===null?"?":fmt(result.estimatedLow))+" – "+(result.estimatedHigh===null?"?":fmt(result.estimatedHigh))),"Confidence: "+(result.valuationConfidence||"low")+" · Basis: "+(result.valuationBasis||"none"),"","Notes: "+(result.notes||"None"),"","Evidence:"];
+  evidence.forEach(function(x,i){lines.push((i+1)+". "+(x.status||"source")+" · "+(x.title||"Untitled")+(x.price===null?"":" · "+(x.currency||"USD")+" "+x.price)+(x.date?" · "+x.date:"")+(x.url?"\n   "+x.url:""));});
+  lines.push("","Research is a guide, not an appraisal. Confirm exact edition and physical condition.",pricing.cached?"Cached result":"Fresh web research");
+  window.alert(lines.join("\n"));
+  if(result.suggestedPrice===null&&result.msrp===null)return;
+  if(!window.confirm("Apply the available suggested price/MSRP to this inventory record?\n\nThis will not approve or publish the item."))return;
+  var updates={},comps=evidence.map(function(x){return [x.status,x.title,x.price===null?"price unknown":(x.currency||"USD")+" "+x.price,x.date,x.condition,x.url,x.comparability].filter(Boolean).join(" | ")}).join("\n");
+  if(result.suggestedPrice!==null){updates.price=result.suggestedPrice;updates.tpv=result.suggestedPrice;}
+  if(result.msrp!==null)updates.msrp=result.msrp;
+  if(evidence.length)updates.market_comps=comps.slice(0,3000);
+  updates.valuation_basis=result.valuationBasis==="sold_comps"?"sold_comps":result.valuationBasis==="catalog"?"catalog":"none";
+  updates.valuation_confidence=result.valuationConfidence||"low";
+  var note="AI price research ("+new Date().toISOString().slice(0,10)+"): "+(result.notes||"No additional notes.");
+  updates.notes=String(item.notes||"").trim()?String(item.notes).trim()+"\n"+note:note;
+  await api("/api/admin/products/"+encodeURIComponent(item.id),{method:"PATCH",body:JSON.stringify(updates)});
+  notice("Research prices saved to "+item.title+". Review condition and comps before approval.");await loadProducts();
+ }catch(err){notice("Price check failed: "+err.message,true)}
+ finally{button.disabled=false;button.textContent=old;}
+}
 function updateDashboard(){var total=inventoryRows.length,published=inventoryRows.filter(function(p){return p.online_published}).length,review=inventoryRows.filter(function(p){return p.review_status!=="approved"||p.zone==="rear_restricted"}).length,rear=inventoryRows.filter(function(p){return p.zone==="rear_restricted"}).length;$("#statTotal").textContent=total;$("#statPublished").textContent=published;$("#statReview").textContent=review;$("#statRear").textContent=rear;var queue=inventoryRows.filter(function(p){return p.review_status!=="approved"||p.zone==="rear_restricted"}).slice(0,5);$("#overviewQueue").innerHTML=queue.length?queue.map(function(p){return '<div class="queue-item"><span><strong>'+esc(p.title)+'</strong><small>'+esc(zoneName(p.zone))+' · '+esc(p.id)+'</small></span><span class="pill '+(p.zone==="rear_restricted"?"red":"gold")+'">'+(p.zone==="rear_restricted"?"Restricted":"Review")+'</span></div>'}).join(""):'<div class="queue-item"><span><strong>All caught up.</strong><small>No review items in the current inventory.</small></span><span class="pill green">Clear</span></div>'}
 async function loadProducts(){try{var d=await api("/api/admin/products");inventoryRows=d.products||[];updateDashboard();renderProducts()}catch(e){if(e.message.indexOf("sign in")>=0)loginView();else{console.error("OneCopy inventory load failed:",e);$("#overviewQueue").innerHTML='<div class="message error">Inventory could not load: '+esc(e.message)+'</div>';$("#products").innerHTML='<tr><td colspan="5" class="emptyrow">Inventory could not load: '+esc(e.message)+'</td></tr>';$("#inventoryFooter").textContent="Check the message above; existing inventory has not been deleted.";notice("Inventory could not load: "+e.message,true)}}}
 $("#products").addEventListener("click",async function(e){
  var b=e.target.closest("button[data-action]");if(!b)return;
  var a=b.dataset.action,id=b.dataset.id,patch={};
+ if(a==="price-check"){runInventoryPriceCheck(id,b);return;}
  if(a==="edit"){openProductEditor(inventoryRows.find(function(p){return p.id===id}));return;}
  if(a==="approve"){
   var candidate=inventoryRows.find(function(p){return p.id===id});
