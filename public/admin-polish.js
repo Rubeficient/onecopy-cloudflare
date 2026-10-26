@@ -165,33 +165,50 @@
  }
  function installCopyableErrorReports(){
   function attach(target){
-   if(!target||target.classList.contains("hidden")||!target.classList.contains("error"))return;
-   if(target.querySelector("[data-oc-copy-error]"))return;
+   if(!target||target.classList.contains("hidden"))return;
+   if(!target.classList.contains("error"))return;
    var message=(target.innerText||target.textContent||"").trim();
-   if(!message)return;
+   if(!message||target.querySelector("[data-oc-copy-error]"))return;
    var btn=document.createElement("button");
-   btn.type="button";btn.className="btn secondary";btn.dataset.ocCopyError="1";
-   btn.textContent="Copy error report";btn.style.marginTop="8px";
-   btn.title="Copy the error message, page and time so it can be shared for troubleshooting.";
+   btn.type="button";btn.dataset.ocCopyError="1";btn.className="btn secondary";
+   btn.textContent="Copy error report";btn.style.cssText="display:inline-block;margin:10px 0 4px;padding:10px 14px;cursor:pointer";
+   btn.title="Copy the full error message, page and time for troubleshooting.";
    btn.addEventListener("click",async function(){
     var report=["OneCopy error report","Time: "+new Date().toISOString(),"Page: "+window.location.href,"Message: "+message].join("\n");
+    var area;
     try{
-     if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(report);}
-     else{
-      var area=document.createElement("textarea");area.value=report;area.setAttribute("readonly","");area.style.position="fixed";area.style.opacity="0";document.body.appendChild(area);area.select();
-      var copied=document.execCommand("copy");area.remove();if(!copied)throw Error("Clipboard unavailable");
-     }
-     btn.textContent="Copied — paste into ChatGPT";btn.classList.add("gold");
-    }catch(e){
-     var area=document.createElement("textarea");area.value=report;area.rows=5;area.style.width="100%";area.setAttribute("aria-label","Copyable OneCopy error report");target.appendChild(area);area.focus();area.select();btn.textContent="Select the report and copy";
-    }
+     if(!navigator.clipboard||!navigator.clipboard.writeText)throw Error("Clipboard API unavailable");
+     await navigator.clipboard.writeText(report);
+     btn.textContent="Copied — paste into ChatGPT";
+     return;
+    }catch(e){}
+    try{
+     area=document.createElement("textarea");area.value=report;area.rows=5;
+     area.setAttribute("aria-label","OneCopy error report — select and copy this text");
+     area.style.cssText="display:block;width:100%;min-height:110px;margin-top:8px;font:12px/1.4 monospace;white-space:pre-wrap";
+     var old=target.querySelector("[data-oc-error-report-text]");
+     if(old)old.remove();
+     area.dataset.ocErrorReportText="1";target.appendChild(area);area.focus();area.select();
+     var copied=false;try{copied=document.execCommand("copy")}catch(e){}
+     if(copied){btn.textContent="Copied — paste into ChatGPT";}
+     else{btn.textContent="Report selected — press Ctrl+C";if(/Mac|iPhone|iPad/.test(navigator.platform||""))btn.textContent="Report selected — press ⌘C";}
+    }catch(e){btn.textContent="Could not prepare report; select the error text above";}
    });
    target.appendChild(document.createElement("br"));target.appendChild(btn);
   }
-  function scan(){["#globalNotice","#notice"].forEach(function(sel){attach($(sel))})}
+  function scan(){
+   ["#globalNotice","#notice",".message.error"].forEach(function(sel){
+    $$(sel).forEach(attach);
+   });
+  }
   scan();
-  var observer=new MutationObserver(scan);
-  ["#globalNotice","#notice"].forEach(function(sel){var target=$(sel);if(target)observer.observe(target,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:["class"]})});
+  if(window.MutationObserver&&document.body){
+   new MutationObserver(scan).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:["class","hidden"]});
+  }
+  document.addEventListener("click",function(e){
+   var btn=e.target&&e.target.closest?e.target.closest("[data-oc-copy-error]"):null;
+   if(btn&&e.isTrusted===false)e.preventDefault();
+  });
  }
  function init(){
   document.body.insertAdjacentHTML("beforeend",guideHtml);
