@@ -210,7 +210,26 @@
    if(btn&&e.isTrusted===false)e.preventDefault();
   });
  }
+ function installDiagnosticsPanel(){
+  if($("#ocDiagnosticsButton"))return;
+  var recentErrors=[];
+  function remember(message){var value=String(message||"").trim();if(!value)return;recentErrors.push(new Date().toISOString()+" — "+value);if(recentErrors.length>12)recentErrors.shift()}
+  window.addEventListener("error",function(e){remember((e.message||"JavaScript error")+(e.filename?" at "+e.filename+":"+e.lineno:""))});
+  window.addEventListener("unhandledrejection",function(e){var r=e.reason;remember("Unhandled promise rejection: "+(r&&r.message?r.message:String(r||"Unknown error")))});
+  var panel=document.createElement("div");panel.id="ocDiagnosticsPanel";panel.style.cssText="position:fixed;right:16px;bottom:16px;z-index:2147483000;max-width:calc(100vw - 32px);font:14px/1.4 system-ui,sans-serif";
+  var button=document.createElement("button");button.id="ocDiagnosticsButton";button.type="button";button.textContent="Copy diagnostics";button.style.cssText="border:1px solid #555;border-radius:10px;background:#202a35;color:white;padding:12px 16px;font-weight:700;box-shadow:0 3px 14px #0004;cursor:pointer";button.title="Copy the current OneCopy message and recent browser errors for support.";
+  var area=document.createElement("textarea");area.id="ocDiagnosticsText";area.rows=7;area.hidden=true;area.setAttribute("aria-label","OneCopy diagnostic report; select and copy this text");area.style.cssText="display:block;box-sizing:border-box;width:min(520px,calc(100vw - 32px));margin-top:8px;padding:8px;font:12px/1.4 monospace;background:white;color:#111;border:2px solid #555;border-radius:8px";
+  button.addEventListener("click",async function(){
+   var notice=$("#globalNotice")||$("#notice");var noticeText=notice?(notice.innerText||notice.textContent||"").trim():"";
+   var report=["OneCopy diagnostic report","Time: "+new Date().toISOString(),"Page: "+location.href,"Browser: "+navigator.userAgent,"Current notice: "+(noticeText||"(no message currently visible)"),"Recent browser errors:",(recentErrors.length?recentErrors.join("\n"):"(none captured)")].join("\n");
+   area.value=report;area.hidden=false;
+   try{if(!navigator.clipboard||!navigator.clipboard.writeText)throw Error("Clipboard unavailable");await navigator.clipboard.writeText(report);button.textContent="Copied — paste into ChatGPT"}
+   catch(e){area.focus();area.select();var copied=false;try{copied=document.execCommand("copy")}catch(ignore){}button.textContent=copied?"Copied — paste into ChatGPT":"Report selected — press Ctrl+C";if(/Mac|iPhone|iPad/.test(navigator.platform||"")&&!copied)button.textContent="Report selected — press ⌘C"}
+  });
+  panel.appendChild(button);panel.appendChild(area);document.body.appendChild(panel);
+ }
  function init(){
+  installDiagnosticsPanel();
   installCopyableErrorReports();
   document.body.insertAdjacentHTML("beforeend",guideHtml);
   installTopbar();installGettingStarted();bindModalEvents();installKeyboard();watchWorkspace();applyHelpfulTooltips();patchDynamicTooltips();
