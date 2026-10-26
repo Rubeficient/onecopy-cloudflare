@@ -748,8 +748,9 @@ async function researchScannedBookPrice(book,env,options={}){
  }catch{return {ok:false,error:"Could not reach Gemini web price research. Bibliographic metadata was still retrieved."};}
  const providerData=await response.json().catch(()=>({}));
  if(!response.ok){
+  const providerMessage=s(providerData&&providerData.error&&providerData.error.message,500);
   const detail=response.status===429?"Gemini quota/rate limit reached; retry later.":response.status===401||response.status===403?"Gemini rejected the configured API key or model access.":"Gemini web price research failed (HTTP "+response.status+").";
-  return {ok:false,error:detail+" Bibliographic metadata was still retrieved."};
+  return {ok:false,error:detail+(providerMessage?" Provider detail: "+providerMessage:"")+" Bibliographic metadata was still retrieved."};
  }
  const output=(providerData.candidates||[]).flatMap(x=>x.content&&Array.isArray(x.content.parts)?x.content.parts:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
  let result;try{result=JSON.parse(output);}catch{return {ok:false,error:"Gemini web research returned an unreadable price result. No prices were applied."};}
