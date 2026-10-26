@@ -525,7 +525,7 @@ async function analyzeItemCaptureWithGemini(body,env){
   const detail=response.status===429?"Gemini's current rate limit or daily quota was reached. Check AI Studio for this project's active limits.":response.status===400?"Gemini rejected the request. Check the configured model and try fewer or clearer photos.":response.status===401||response.status===403?"Gemini rejected the API key or project access. Check GEMINI_API_KEY and Google AI Studio settings.":"Gemini analysis failed (HTTP "+response.status+").";
   return json({error:detail},response.status===429?429:502);
  }
- const output=typeof providerData.output_text==="string"?providerData.output_text:(providerData.steps||[]).filter(x=>x.type==="model_output").flatMap(x=>Array.isArray(x.content)?x.content:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
+ const output=(providerData.candidates||[]).flatMap(x=>x.content&&Array.isArray(x.content.parts)?x.content.parts:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
  let result;
  try{result=JSON.parse(output.replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,""));}catch{return json({error:"Gemini returned an invalid catalog result. Try clearer photos or fewer items."},502);}
  const fields=["title","creator","brand","manufacturer","publisher","publicationYear","edition","identifier","materials","model","conditionNotes","description","valuationNotes"];
@@ -752,7 +752,7 @@ async function researchScannedBookPrice(book,env,options={}){
   const detail=response.status===429?"Gemini quota/rate limit reached; retry later.":response.status===401||response.status===403?"Gemini rejected the configured API key or model access.":"Gemini web price research failed (HTTP "+response.status+").";
   return {ok:false,error:detail+(providerMessage?" Provider detail: "+providerMessage:"")+" Bibliographic metadata was still retrieved."};
  }
- const output=(providerData.candidates||[]).flatMap(x=>x.content&&Array.isArray(x.content.parts)?x.content.parts:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
+ const output=typeof providerData.output_text==="string"?providerData.output_text:(providerData.steps||[]).filter(x=>x.type==="model_output").flatMap(x=>Array.isArray(x.content)?x.content:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
  let result;try{const cleanOutput=output.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"");const start=cleanOutput.indexOf("{"),end=cleanOutput.lastIndexOf("}");if(start<0||end<start)throw new Error("No JSON object");result=JSON.parse(cleanOutput.slice(start,end+1));}catch{return {ok:false,error:"Gemini web research returned an unreadable price result. No prices were applied."};}
  for(const key of ["msrp","estimatedLow","estimatedHigh","suggestedPrice"]){const n=Number(result[key]);result[key]=result[key]===null||result[key]===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100;}
  if(!["sold_comps","active_listings","catalog","none"].includes(result.valuationBasis))result.valuationBasis="none";
