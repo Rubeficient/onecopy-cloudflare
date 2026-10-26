@@ -163,9 +163,39 @@
   document.addEventListener("pointerover",setActionTip);
   document.addEventListener("focusin",setActionTip);
  }
+ function installCopyableErrorReports(){
+  function attach(target){
+   if(!target||target.classList.contains("hidden")||!target.classList.contains("error"))return;
+   if(target.querySelector("[data-oc-copy-error]"))return;
+   var message=(target.innerText||target.textContent||"").trim();
+   if(!message)return;
+   var btn=document.createElement("button");
+   btn.type="button";btn.className="btn secondary";btn.dataset.ocCopyError="1";
+   btn.textContent="Copy error report";btn.style.marginTop="8px";
+   btn.title="Copy the error message, page and time so it can be shared for troubleshooting.";
+   btn.addEventListener("click",async function(){
+    var report=["OneCopy error report","Time: "+new Date().toISOString(),"Page: "+window.location.href,"Message: "+message].join("\n");
+    try{
+     if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(report);}
+     else{
+      var area=document.createElement("textarea");area.value=report;area.setAttribute("readonly","");area.style.position="fixed";area.style.opacity="0";document.body.appendChild(area);area.select();
+      var copied=document.execCommand("copy");area.remove();if(!copied)throw Error("Clipboard unavailable");
+     }
+     btn.textContent="Copied — paste into ChatGPT";btn.classList.add("gold");
+    }catch(e){
+     var area=document.createElement("textarea");area.value=report;area.rows=5;area.style.width="100%";area.setAttribute("aria-label","Copyable OneCopy error report");target.appendChild(area);area.focus();area.select();btn.textContent="Select the report and copy";
+    }
+   });
+   target.appendChild(document.createElement("br"));target.appendChild(btn);
+  }
+  function scan(){["#globalNotice","#notice"].forEach(function(sel){attach($(sel))})}
+  scan();
+  var observer=new MutationObserver(scan);
+  ["#globalNotice","#notice"].forEach(function(sel){var target=$(sel);if(target)observer.observe(target,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:["class"]})});
+ }
  function init(){
   document.body.insertAdjacentHTML("beforeend",guideHtml);
-  installTopbar();installGettingStarted();bindModalEvents();installKeyboard();watchWorkspace();applyHelpfulTooltips();patchDynamicTooltips();
+  installTopbar();installGettingStarted();bindModalEvents();installKeyboard();watchWorkspace();applyHelpfulTooltips();patchDynamicTooltips();installCopyableErrorReports();
   if(typeof window.installHelp==="function")window.installHelp();
  }
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
