@@ -722,14 +722,14 @@ const SCANNED_BOOK_PRICE_SCHEMA={
   notes:{type:"string"},needsReview:{type:"boolean"}
  }
 };
-async function researchScannedBookPrice(book,env){
+async function researchScannedBookPrice(book,env,options={}){
  if(!env.GEMINI_API_KEY)return {ok:false,error:"Gemini web price research is not configured. Add GEMINI_API_KEY as a Cloudflare Worker secret."};
  const barcode=cleanBarcode(book&& (book.barcode||book.isbn)||"");
  if(!book||!book.found||!book.title||!barcode)return {ok:false,error:"An exact ISBN metadata match is required before price research."};
  try{
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS book_price_research_cache (barcode TEXT PRIMARY KEY, result_json TEXT NOT NULL, checked_at TEXT NOT NULL, expires_at TEXT NOT NULL)").run();
   const cached=await env.DB.prepare("SELECT result_json,expires_at FROM book_price_research_cache WHERE barcode=?").bind(barcode).first();
-  if(cached&&Date.parse(cached.expires_at)>Date.now()){try{return {...JSON.parse(cached.result_json),cached:true};}catch{}}
+  if(!options.forceRefresh&&cached&&Date.parse(cached.expires_at)>Date.now()){try{return {...JSON.parse(cached.result_json),cached:true};}catch{}}
  }catch{}
  const prompt=[
   "You are OneCopy's cautious used-book market research assistant for an independent bookstore in Pomona, California.",
@@ -975,6 +975,17 @@ async function api(req,env,url){
    return json({ok:true,count:items.length,items},201);
   }
   if(p==="/api/admin/products"&&method==="GET"){const r=await env.DB.prepare("SELECT * FROM products ORDER BY created_at DESC LIMIT 1000").all();return json({products:(r.results||[]).map(toAdmin)});}
+  const priceCheckMatch=p.match(/^\/api\/admin\/products\/([^/]+)\/price-check$/);
+  if(priceCheckMatch&&method==="POST"){
+   const id=decodeURIComponent(priceCheckMatch[1]);
+   const row=await env.DB.prepare("SELECT * FROM products WHERE id=?").bind(id).first();
+   if(!row)return json({error:"Inventory item not found."},404);
+   const item=toAdmin(row),isbn=cleanBarcode(item.isbn||item.identifier||"");
+   if(!isbn||isbn.length<8)return json({error:"This item has no usable ISBN/barcode. ISBN-based web price research needs an exact identifier; add the ISBN in Edit details first."},400);
+   const book={found:true,barcode:isbn,isbn,title:s(item.title,300),subtitle:"",author:s(item.author,200),publisher:s(item.publisher,200),publicationYear:s(item.publication_year,40),format:s(item.format,100),pageCount:item.page_count||""};
+   const pricing=await researchScannedBookPrice(book,env,{forceRefresh:true});
+   return json({ok:true,item:{id:item.id,title:item.title,isbn},pricing});
+  }
   if(p==="/api/admin/products"&&method==="POST"){
    const b=await read(req);if(!b)return json({error:"Invalid JSON."},400);const x=normal(b);if(x.error)return json({error:x.error},400);
    const id="OC-"+crypto.randomUUID().replace(/-/g,"").slice(0,10).toUpperCase(),now=new Date().toISOString();
