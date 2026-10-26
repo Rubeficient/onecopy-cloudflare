@@ -211,8 +211,9 @@
   });
  }
  function init(){
+  installCopyableErrorReports();
   document.body.insertAdjacentHTML("beforeend",guideHtml);
-  installTopbar();installGettingStarted();bindModalEvents();installKeyboard();watchWorkspace();applyHelpfulTooltips();patchDynamicTooltips();installCopyableErrorReports();
+  installTopbar();installGettingStarted();bindModalEvents();installKeyboard();watchWorkspace();applyHelpfulTooltips();patchDynamicTooltips();
   if(typeof window.installHelp==="function")window.installHelp();
  }
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
