@@ -753,7 +753,7 @@ async function researchScannedBookPrice(book,env,options={}){
   return {ok:false,error:detail+(providerMessage?" Provider detail: "+providerMessage:"")+" Bibliographic metadata was still retrieved."};
  }
  const output=(providerData.candidates||[]).flatMap(x=>x.content&&Array.isArray(x.content.parts)?x.content.parts:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
- let result;try{const cleanOutput=output.trim().replace(/^```(?:json)?\\s*/i,"").replace(/\\s*```$/,"");const start=cleanOutput.indexOf("{"),end=cleanOutput.lastIndexOf("}");if(start<0||end<start)throw new Error("No JSON object");result=JSON.parse(cleanOutput.slice(start,end+1));}catch{return {ok:false,error:"Gemini web research returned an unreadable price result. No prices were applied."};}
+ let result;try{const cleanOutput=output.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"");const start=cleanOutput.indexOf("{"),end=cleanOutput.lastIndexOf("}");if(start<0||end<start)throw new Error("No JSON object");result=JSON.parse(cleanOutput.slice(start,end+1));}catch{return {ok:false,error:"Gemini web research returned an unreadable price result. No prices were applied."};}
  for(const key of ["msrp","estimatedLow","estimatedHigh","suggestedPrice"]){const n=Number(result[key]);result[key]=result[key]===null||result[key]===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100;}
  if(!["sold_comps","active_listings","catalog","none"].includes(result.valuationBasis))result.valuationBasis="none";
  if(!["low","medium","high"].includes(result.valuationConfidence))result.valuationConfidence="low";
