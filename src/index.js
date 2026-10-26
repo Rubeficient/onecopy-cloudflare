@@ -525,7 +525,7 @@ async function analyzeItemCaptureWithGemini(body,env){
   const detail=response.status===429?"Gemini's current rate limit or daily quota was reached. Check AI Studio for this project's active limits.":response.status===400?"Gemini rejected the request. Check the configured model and try fewer or clearer photos.":response.status===401||response.status===403?"Gemini rejected the API key or project access. Check GEMINI_API_KEY and Google AI Studio settings.":"Gemini analysis failed (HTTP "+response.status+").";
   return json({error:detail},response.status===429?429:502);
  }
- const output=(providerData.candidates||[]).flatMap(x=>x.content&&Array.isArray(x.content.parts)?x.content.parts:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
+ const output=typeof providerData.output_text==="string"?providerData.output_text:(providerData.steps||[]).filter(x=>x.type==="model_output").flatMap(x=>Array.isArray(x.content)?x.content:[]).filter(x=>typeof x.text==="string").map(x=>x.text).join("\n");
  let result;
  try{result=JSON.parse(output.replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,""));}catch{return json({error:"Gemini returned an invalid catalog result. Try clearer photos or fewer items."},502);}
  const fields=["title","creator","brand","manufacturer","publisher","publicationYear","edition","identifier","materials","model","conditionNotes","description","valuationNotes"];
@@ -741,10 +741,10 @@ async function researchScannedBookPrice(book,env,options={}){
   "Return JSON only matching the provided schema. Use USD when evidence is in US dollars; preserve source currency otherwise. Include source URLs in marketEvidence only when actually found. Summarize important evidence gaps in notes.",
   "Research date: "+new Date().toISOString().slice(0,10)+"."
  ].join("\n");
- const model=s(env.GEMINI_PRICE_MODEL||env.GEMINI_MODEL||"gemini-2.5-flash",100);
+ const model=s(env.GEMINI_PRICE_MODEL||"gemini-3.8-flash",100);
  let response;
  try{
-  response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],tools:[{google_search:{}}],generationConfig:{temperature:0.1,maxOutputTokens:2600}})});
+  response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"content-type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify({model,input:prompt,tools:[{type:"google_search"}],generation_config:{max_output_tokens:2600},store:false})});
  }catch{return {ok:false,error:"Could not reach Gemini web price research. Bibliographic metadata was still retrieved."};}
  const providerData=await response.json().catch(()=>({}));
  if(!response.ok){
@@ -763,7 +763,7 @@ async function researchScannedBookPrice(book,env,options={}){
   const n=Number(x.price);
   return {title:s(x.title,250),seller:s(x.seller,160),price:x.price===null||x.price===""||!Number.isFinite(n)||n<0?null:Math.round(n*100)/100,currency:s(x.currency||"USD",10),condition:s(x.condition,100),status:["active_listing","sold_record","catalog_reference","unknown"].includes(x.status)?x.status:"unknown",url,date:s(x.date,80),comparability:s(x.comparability,350)};
  });
- const groundedSources=(providerData.candidates||[]).flatMap(x=>x.groundingMetadata&&Array.isArray(x.groundingMetadata.groundingChunks)?x.groundingMetadata.groundingChunks:[]).map(x=>x.web&&x.web.uri?{title:s(x.web.title||x.web.uri,250),url:x.web.uri}:null).filter(x=>x&&/^https?:\/\//i.test(x.url)).slice(0,12);
+ const groundedSources=(providerData.steps||[]).filter(x=>x.type==="model_output").flatMap(x=>Array.isArray(x.content)?x.content:[]).flatMap(x=>Array.isArray(x.annotations)?x.annotations:[]).filter(x=>x.type==="url_citation"&&typeof x.url==="string").map(x=>({title:s(x.title||x.url,250),url:x.url})).filter(x=>/^https?:\/\//i.test(x.url)).slice(0,12);
  const seen=new Set(result.marketEvidence.map(x=>x.url).filter(Boolean));
  for(const source of groundedSources){if(!seen.has(source.url)&&result.marketEvidence.length<8){result.marketEvidence.push({title:source.title,seller:"",price:null,currency:"USD",condition:"",status:"unknown",url:source.url,date:"",comparability:"Grounded search source; inspect page to confirm exact edition, price and sale status."});seen.add(source.url);}}
  const resultBundle={ok:true,result,researchSources:groundedSources,provider:"gemini",model,disclaimer:"Gemini-grounded price research is a research aid, not a formal appraisal. Confirm exact edition, physical condition and source records before setting a final price."};
